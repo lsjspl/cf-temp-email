@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { translateErrorMessage, translateManualSteps } from "./i18n";
 
 export type AppErrorCode =
   | "UNAUTHORIZED"
@@ -22,13 +23,23 @@ export function errorResponse(
   message: string,
   details?: Record<string, unknown>,
 ) {
+  const locale = typeof (c as { get?: (key: string) => unknown }).get === "function"
+    ? (((c as { get: (key: string) => unknown }).get("locale") as string | undefined) ?? "zh-CN")
+    : "zh-CN";
+  const translated = translateErrorMessage(locale === "en" ? "en" : "zh-CN", message);
+  const translatedDetails = details
+    ? {
+        ...details,
+        manual_steps: translateManualSteps(locale === "en" ? "en" : "zh-CN", details.manual_steps),
+      }
+    : undefined;
   return c.json(
     {
       error: {
         code,
-        message,
+        message: translated,
       },
-      ...(details ?? {}),
+      ...(translatedDetails ?? {}),
     },
     status,
   );

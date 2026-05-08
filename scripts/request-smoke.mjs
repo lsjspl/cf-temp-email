@@ -243,6 +243,14 @@ async function main() {
     const userPassword = "UserPass123!";
     const domainName = `tmp-${suffix}.example.com`;
 
+    let htmlResponse = await request("/setup", { method: "GET" }, {}, "198.51.100.11");
+    assert.equal(htmlResponse.status, 200);
+    assert.ok((await htmlResponse.text()).includes("初始化系统"));
+
+    htmlResponse = await request("/setup?lang=en", { method: "GET" }, {}, "198.51.100.11");
+    assert.equal(htmlResponse.status, 200);
+    assert.ok((await htmlResponse.text()).includes("Initialize System"));
+
     logStep("initialize first admin");
     let result = await requestJson(
       "/setup/initialize",
@@ -491,9 +499,13 @@ async function main() {
     assert.equal(result.body.message.text_body, null);
     assert.equal(result.body.message.html_body, null);
 
-    let htmlResponse = await request(`/inbox/not-a-real-link-${suffix}`, { method: "GET" }, {}, "198.51.100.21");
+    htmlResponse = await request(`/inbox/not-a-real-link-${suffix}`, { method: "GET" }, {}, "198.51.100.21");
     assert.equal(htmlResponse.status, 404);
     assert.ok((htmlResponse.headers.get("content-type") || "").includes("text/html"));
+    assert.ok((await htmlResponse.text()).includes("收件箱不可用"));
+
+    htmlResponse = await request(`/inbox/not-a-real-link-${suffix}?lang=en`, { method: "GET" }, {}, "198.51.100.21");
+    assert.equal(htmlResponse.status, 404);
     assert.ok((await htmlResponse.text()).includes("Inbox unavailable"));
 
     logStep("exercise inbox rate limit");

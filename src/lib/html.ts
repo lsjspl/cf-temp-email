@@ -16,11 +16,13 @@ export function renderDocument(options: {
   body: string;
   head?: string;
   pageClassName?: string;
+  lang?: string;
 }) {
   const pageClassName = options.pageClassName ? ` class="${escapeHtml(options.pageClassName)}"` : "";
+  const lang = options.lang ? escapeHtml(options.lang) : "zh-CN";
 
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${lang}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

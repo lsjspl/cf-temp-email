@@ -13,6 +13,7 @@ import { ensureDatabaseReady } from "./lib/db-bootstrap";
 import { runCleanup } from "./lib/cleanup";
 import { processInboundEmail } from "./lib/email";
 import { AppRouteError, errorResponse } from "./lib/errors";
+import { attachLocale } from "./lib/i18n";
 import { getInboxAttachment, getInboxMessage, listInboxMessages, validateInboxAccessToken } from "./lib/inbox";
 import { apiRateLimit, inboxRateLimit, loginRateLimit } from "./lib/rate-limit";
 import adminApp from "./routes/admin";
@@ -30,6 +31,7 @@ app.use("*", async (c, next) => {
   await ensureDatabaseReady(c.env);
   await next();
 });
+app.use("*", attachLocale);
 app.use("*", attachRequestMetadata);
 app.use("*", loadSessionUser);
 app.use("/auth/login", loginRateLimit());

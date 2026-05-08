@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 
 import { countAdmins } from "../lib/auth";
-import { jsonForScript, renderDocument } from "../lib/html";
 import { AppRouteError } from "../lib/errors";
+import { jsonForScript, renderDocument } from "../lib/html";
+import { translateErrorMessage, type Locale } from "../lib/i18n";
 import { validateInboxAccessToken } from "../lib/inbox";
+import { getUi, languageSwitcher } from "../lib/web-i18n";
 import type { AppSchema } from "../types/app";
 
 const webApp = new Hono<AppSchema>();
@@ -17,29 +19,32 @@ function redirect(location: string, status = 302) {
   });
 }
 
-function loginPageHtml() {
+function loginPageHtml(locale: Locale) {
+  const ui = getUi(locale);
   return renderDocument({
-    title: "Temp Mail Login",
+    title: ui.login.title,
+    lang: locale,
     body: `
       <div class="shell auth-shell">
         <section class="auth-card">
+          ${languageSwitcher("/login", locale)}
           <div class="auth-header">
-            <h1>Temp Mail Console</h1>
-            <p>Sessions, domains, mailboxes, and messages in one place.</p>
+            <h1>${ui.login.heading}</h1>
+            <p>${ui.login.subtitle}</p>
           </div>
           <div class="auth-body">
             <form id="login-form" class="field-grid">
               <div class="field">
-                <label for="login">Email or username</label>
+                <label for="login">${ui.login.login}</label>
                 <input id="login" name="login" class="input" autocomplete="username" />
               </div>
               <div class="field">
-                <label for="password">Password</label>
+                <label for="password">${ui.login.password}</label>
                 <input id="password" name="password" class="input" type="password" autocomplete="current-password" />
               </div>
               <div id="login-error" class="notice error hidden"></div>
               <div class="button-row">
-                <button class="button primary" type="submit">Sign in</button>
+                <button class="button primary" type="submit">${ui.login.submit}</button>
               </div>
             </form>
           </div>
@@ -63,7 +68,7 @@ function loginPageHtml() {
           });
           if (!response.ok) {
             const result = await response.json().catch(() => null);
-            errorNode.textContent = result?.error?.message ?? "Login failed";
+            errorNode.textContent = result?.error?.message ?? ${jsonForScript(ui.login.failed)};
             errorNode.classList.remove("hidden");
             return;
           }
@@ -74,33 +79,36 @@ function loginPageHtml() {
   });
 }
 
-function setupPageHtml() {
+function setupPageHtml(locale: Locale) {
+  const ui = getUi(locale);
   return renderDocument({
-    title: "Initialize Temp Mail",
+    title: ui.setup.title,
+    lang: locale,
     body: `
       <div class="shell auth-shell">
         <section class="auth-card">
+          ${languageSwitcher("/setup", locale)}
           <div class="auth-header">
-            <h1>Initialize System</h1>
-            <p>Create the first administrator. Setup closes after that.</p>
+            <h1>${ui.setup.heading}</h1>
+            <p>${ui.setup.subtitle}</p>
           </div>
           <div class="auth-body">
             <form id="setup-form" class="field-grid">
               <div class="field">
-                <label for="email">Admin email</label>
+                <label for="email">${ui.setup.email}</label>
                 <input id="email" name="email" class="input" autocomplete="email" />
               </div>
               <div class="field">
-                <label for="username">Username</label>
+                <label for="username">${ui.setup.username}</label>
                 <input id="username" name="username" class="input" autocomplete="username" />
               </div>
               <div class="field">
-                <label for="password">Password</label>
+                <label for="password">${ui.setup.password}</label>
                 <input id="password" name="password" class="input" type="password" autocomplete="new-password" />
               </div>
               <div id="setup-error" class="notice error hidden"></div>
               <div class="button-row">
-                <button class="button primary" type="submit">Initialize</button>
+                <button class="button primary" type="submit">${ui.setup.submit}</button>
               </div>
             </form>
           </div>
@@ -125,7 +133,7 @@ function setupPageHtml() {
           });
           if (!response.ok) {
             const result = await response.json().catch(() => null);
-            errorNode.textContent = result?.error?.message ?? "Initialization failed";
+            errorNode.textContent = result?.error?.message ?? ${jsonForScript(ui.setup.failed)};
             errorNode.classList.remove("hidden");
             return;
           }
@@ -137,38 +145,42 @@ function setupPageHtml() {
   });
 }
 
-function dashboardPageHtml(user: { email: string; role: string }) {
-  const roleLabel = user.role === "admin" ? "Admin" : "User";
+function dashboardPageHtml(user: { email: string; role: string }, locale: Locale) {
+  const ui = getUi(locale);
+  const roleLabel = user.role === "admin" ? ui.dashboard.admin : ui.dashboard.user;
 
   return renderDocument({
-    title: "Temp Mail Console",
+    title: ui.dashboard.title,
+    lang: locale,
     body: `
       <div class="shell">
         <header class="page-header">
           <div class="page-title">
-            <h1>Temp Mail Console</h1>
-            <p>${roleLabel} · ${user.email}</p>
+            <h1>${ui.dashboard.title}</h1>
+            <p>${roleLabel} / ${user.email}</p>
           </div>
           <div class="button-row">
-            <button id="refresh-all" class="button">Refresh</button>
-            <button id="logout" class="button danger">Logout</button>
+            <a class="button" href="/app?lang=zh-CN">中文</a>
+            <a class="button" href="/app?lang=en">English</a>
+            <button id="refresh-all" class="button">${ui.common.refresh}</button>
+            <button id="logout" class="button danger">${ui.common.logout}</button>
           </div>
         </header>
         <div class="dashboard-grid">
           <aside class="panel sidebar">
-            <button class="nav-button active" data-panel="overview">Overview</button>
-            <button class="nav-button" data-panel="mailboxes">Mailboxes</button>
-            <button class="nav-button" data-panel="tokens">API Tokens</button>
-            <button class="nav-button" data-panel="domains">Domains</button>
-            <button class="nav-button ${user.role === "admin" ? "" : "hidden"}" data-panel="users">Users</button>
-            <button class="nav-button ${user.role === "admin" ? "" : "hidden"}" data-panel="ops">Ops</button>
+            <button class="nav-button active" data-panel="overview">${ui.dashboard.overview}</button>
+            <button class="nav-button" data-panel="mailboxes">${ui.dashboard.mailboxes}</button>
+            <button class="nav-button" data-panel="tokens">${ui.dashboard.tokens}</button>
+            <button class="nav-button" data-panel="domains">${ui.dashboard.domains}</button>
+            <button class="nav-button ${user.role === "admin" ? "" : "hidden"}" data-panel="users">${ui.dashboard.users}</button>
+            <button class="nav-button ${user.role === "admin" ? "" : "hidden"}" data-panel="ops">${ui.dashboard.ops}</button>
           </aside>
           <main class="content-column">
             <section id="panel-overview" class="panel">
               <div class="panel-header">
                 <div>
-                  <h2>Overview</h2>
-                  <div class="meta">Current resource summary.</div>
+                  <h2>${ui.dashboard.overview}</h2>
+                  <div class="meta">${ui.dashboard.currentSummary}</div>
                 </div>
               </div>
               <div id="metrics" class="metric-grid"></div>
@@ -177,34 +189,34 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             <section id="panel-mailboxes" class="panel hidden">
               <div class="panel-header">
                 <div>
-                  <h2>Mailboxes</h2>
-                  <div class="meta">Create mailboxes and inspect recent messages.</div>
+                  <h2>${ui.dashboard.mailboxesTitle}</h2>
+                  <div class="meta">${ui.dashboard.mailboxesSubtitle}</div>
                 </div>
               </div>
               <div class="split-grid">
                 <form id="mailbox-form" class="field-grid">
                   <div class="field">
-                    <label for="mailbox-domain">Domain</label>
+                    <label for="mailbox-domain">${ui.dashboard.domain}</label>
                     <select id="mailbox-domain" class="select" name="domain_id"></select>
                   </div>
                   <div class="field">
-                    <label for="mailbox-prefix">Prefix</label>
+                    <label for="mailbox-prefix">${ui.dashboard.prefix}</label>
                     <input id="mailbox-prefix" class="input" name="prefix" />
                   </div>
                   <div class="field">
-                    <label for="mailbox-ttl">TTL seconds</label>
+                    <label for="mailbox-ttl">${ui.dashboard.ttlSeconds}</label>
                     <input id="mailbox-ttl" class="input" name="ttl_seconds" type="number" value="86400" />
                   </div>
                   <div id="mailbox-feedback" class="notice hidden"></div>
                   <div class="button-row">
-                    <button class="button primary" type="submit">Create mailbox</button>
+                    <button class="button primary" type="submit">${ui.dashboard.createMailbox}</button>
                   </div>
                 </form>
                 <div class="panel" style="padding:16px; background:rgba(255,255,255,0.025);">
                   <div class="panel-header">
                     <div>
-                      <h3>Message Peek</h3>
-                      <div class="meta">Read messages for the selected mailbox.</div>
+                      <h3>${ui.dashboard.messagePeek}</h3>
+                      <div class="meta">${ui.dashboard.messagePeekSubtitle}</div>
                     </div>
                   </div>
                   <select id="mailbox-picker" class="select"></select>
@@ -217,19 +229,19 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             <section id="panel-tokens" class="panel hidden">
               <div class="panel-header">
                 <div>
-                  <h2>API Tokens</h2>
-                  <div class="meta">Token values are shown once.</div>
+                  <h2>${ui.dashboard.tokensTitle}</h2>
+                  <div class="meta">${ui.dashboard.tokensSubtitle}</div>
                 </div>
               </div>
               <div class="split-grid">
                 <form id="token-form" class="field-grid">
                   <div class="field">
-                    <label for="token-name">Name</label>
+                    <label for="token-name">${ui.dashboard.name}</label>
                     <input id="token-name" class="input" name="name" />
                   </div>
                   <div id="token-feedback" class="notice hidden"></div>
                   <div class="button-row">
-                    <button class="button primary" type="submit">Create token</button>
+                    <button class="button primary" type="submit">${ui.dashboard.createToken}</button>
                   </div>
                 </form>
                 <div id="token-secret" class="notice hidden mono"></div>
@@ -240,47 +252,47 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             <section id="panel-domains" class="panel hidden">
               <div class="panel-header">
                 <div>
-                  <h2>Domains</h2>
-                  <div class="meta">Assign active domains before mailbox creation.</div>
+                  <h2>${ui.dashboard.domainsTitle}</h2>
+                  <div class="meta">${ui.dashboard.domainsSubtitle}</div>
                 </div>
               </div>
               <div class="split-grid ${user.role === "admin" ? "" : "hidden"}">
                 <form id="domain-form" class="field-grid">
                   <div class="field">
-                    <label for="domain-name">Domain</label>
+                    <label for="domain-name">${ui.dashboard.domain}</label>
                     <input id="domain-name" class="input" name="domain" />
                   </div>
                   <div class="field">
-                    <label for="domain-type">Type</label>
+                    <label for="domain-type">${ui.dashboard.type}</label>
                     <select id="domain-type" class="select" name="type">
-                      <option value="subdomain">subdomain</option>
-                      <option value="root">root</option>
+                      <option value="subdomain">${ui.dashboard.statusLabels.subdomain}</option>
+                      <option value="root">${ui.dashboard.statusLabels.root}</option>
                     </select>
                   </div>
                   <div class="field">
-                    <label for="domain-status">Status</label>
+                    <label for="domain-status">${ui.dashboard.status}</label>
                     <select id="domain-status" class="select" name="status">
-                      <option value="pending">pending</option>
-                      <option value="active">active</option>
+                      <option value="pending">${ui.dashboard.statusLabels.pending}</option>
+                      <option value="active">${ui.dashboard.statusLabels.active}</option>
                     </select>
                   </div>
                   <div id="domain-feedback" class="notice hidden"></div>
                   <div class="button-row">
-                    <button class="button primary" type="submit">Add domain</button>
+                    <button class="button primary" type="submit">${ui.dashboard.addDomain}</button>
                   </div>
                 </form>
                 <form id="assign-form" class="field-grid">
                   <div class="field">
-                    <label for="assign-user">User</label>
+                    <label for="assign-user">${ui.dashboard.assignUser}</label>
                     <select id="assign-user" class="select" name="user_id"></select>
                   </div>
                   <div class="field">
-                    <label for="assign-domain">Domain</label>
+                    <label for="assign-domain">${ui.dashboard.assignDomain}</label>
                     <select id="assign-domain" class="select" name="domain_id"></select>
                   </div>
                   <div id="assign-feedback" class="notice hidden"></div>
                   <div class="button-row">
-                    <button class="button primary" type="submit">Assign domain</button>
+                    <button class="button primary" type="submit">${ui.dashboard.assignDomainAction}</button>
                   </div>
                 </form>
               </div>
@@ -290,39 +302,37 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             <section id="panel-users" class="panel hidden ${user.role === "admin" ? "" : "hidden"}">
               <div class="panel-header">
                 <div>
-                  <h2>Users</h2>
-                  <div class="meta">Create and manage system users.</div>
+                  <h2>${ui.dashboard.usersTitle}</h2>
+                  <div class="meta">${ui.dashboard.usersSubtitle}</div>
                 </div>
               </div>
               <div class="split-grid">
                 <form id="user-form" class="field-grid">
                   <div class="field">
-                    <label for="user-email">Email</label>
+                    <label for="user-email">${ui.dashboard.email}</label>
                     <input id="user-email" class="input" name="email" />
                   </div>
                   <div class="field">
-                    <label for="user-username">Username</label>
+                    <label for="user-username">${ui.dashboard.username}</label>
                     <input id="user-username" class="input" name="username" />
                   </div>
                   <div class="field">
-                    <label for="user-password">Password</label>
+                    <label for="user-password">${ui.dashboard.password}</label>
                     <input id="user-password" class="input" name="password" type="password" />
                   </div>
                   <div class="field">
-                    <label for="user-role">Role</label>
+                    <label for="user-role">${ui.dashboard.role}</label>
                     <select id="user-role" class="select" name="role">
-                      <option value="user">user</option>
-                      <option value="admin">admin</option>
+                      <option value="user">${ui.dashboard.statusLabels.user}</option>
+                      <option value="admin">${ui.dashboard.statusLabels.admin}</option>
                     </select>
                   </div>
                   <div id="user-feedback" class="notice hidden"></div>
                   <div class="button-row">
-                    <button class="button primary" type="submit">Create user</button>
+                    <button class="button primary" type="submit">${ui.dashboard.createUser}</button>
                   </div>
                 </form>
-                <div class="notice">
-                  Status and deletion actions are available in the user table.
-                </div>
+                <div class="notice">${ui.dashboard.userActionsHint}</div>
               </div>
               <div id="user-list" class="table-wrap" style="margin-top:16px;"></div>
             </section>
@@ -330,41 +340,41 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             <section id="panel-ops" class="panel hidden ${user.role === "admin" ? "" : "hidden"}">
               <div class="panel-header">
                 <div>
-                  <h2>Operations</h2>
-                  <div class="meta">Cloudflare status and audit visibility.</div>
+                  <h2>${ui.dashboard.ops}</h2>
+                  <div class="meta">${ui.dashboard.operationsSubtitle}</div>
                 </div>
               </div>
               <div class="card-grid">
                 <div class="metric">
-                  <span class="meta">Cloudflare Runtime</span>
+                  <span class="meta">${ui.dashboard.cloudflareRuntime}</span>
                   <strong id="cf-runtime-state">-</strong>
                 </div>
                 <div class="metric">
-                  <span class="meta">All Mailboxes</span>
+                  <span class="meta">${ui.dashboard.allMailboxes}</span>
                   <strong id="ops-mailboxes">-</strong>
                 </div>
                 <div class="metric">
-                  <span class="meta">All Messages</span>
+                  <span class="meta">${ui.dashboard.allMessages}</span>
                   <strong id="ops-messages">-</strong>
                 </div>
-              <div class="metric">
-                <span class="meta">Audit Logs</span>
-                <strong id="ops-audits">-</strong>
+                <div class="metric">
+                  <span class="meta">${ui.dashboard.auditLogs}</span>
+                  <strong id="ops-audits">-</strong>
+                </div>
+                <div class="metric">
+                  <span class="meta">${ui.dashboard.allTokens}</span>
+                  <strong id="ops-tokens">-</strong>
+                </div>
               </div>
-              <div class="metric">
-                <span class="meta">All Tokens</span>
-                <strong id="ops-tokens">-</strong>
-              </div>
-            </div>
               <form id="cloudflare-config-form" class="field-grid" style="margin-top:16px;">
                 <div class="field">
-                  <label for="cloudflare-api-token">Cloudflare API token</label>
+                  <label for="cloudflare-api-token">${ui.dashboard.cloudflareToken}</label>
                   <input id="cloudflare-api-token" class="input" name="api_token" type="password" autocomplete="off" />
                 </div>
                 <div id="cloudflare-feedback" class="notice hidden"></div>
                 <div class="button-row">
-                  <button class="button primary" type="submit">Save token</button>
-                  <button id="cloudflare-clear" class="button" type="button">Clear token</button>
+                  <button class="button primary" type="submit">${ui.dashboard.saveToken}</button>
+                  <button id="cloudflare-clear" class="button" type="button">${ui.dashboard.clearToken}</button>
                 </div>
               </form>
               <div id="ops-status" class="notice" style="margin-top:16px;"></div>
@@ -378,6 +388,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
       </div>
       <script>
         const CURRENT_USER = ${jsonForScript(user)};
+        const UI = ${jsonForScript(ui)};
         const state = {
           users: [],
           domains: [],
@@ -426,14 +437,19 @@ function dashboardPageHtml(user: { email: string; role: string }) {
         }
 
         function tagClass(value) {
-          if (["active", "ok", true, "admin"].includes(value)) return "good";
+          if (["active", "ok", true, "admin", "ready"].includes(value)) return "good";
           if (["pending"].includes(value)) return "warn";
-          if (["disabled", "failed", "revoked", false].includes(value)) return "bad";
+          if (["disabled", "failed", "revoked", false, "missing", "incomplete"].includes(value)) return "bad";
           return "";
         }
 
+        function translateLabel(value) {
+          const key = String(value ?? "");
+          return UI.dashboard.statusLabels[key] || key;
+        }
+
         function formatTag(value) {
-          return '<span class="tag ' + tagClass(value) + '">' + escapeHtml(value) + '</span>';
+          return '<span class="tag ' + tagClass(value) + '">' + escapeHtml(translateLabel(value)) + '</span>';
         }
 
         function showFeedback(id, message, kind = "ok") {
@@ -455,7 +471,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
           const isJson = response.headers.get("content-type")?.includes("application/json");
           const result = isJson ? await response.json() : null;
           if (!response.ok) {
-            const error = new Error(result?.error?.message || "Request failed");
+            const error = new Error(result?.error?.message || UI.common.requestFailed);
             error.payload = result;
             throw error;
           }
@@ -468,23 +484,23 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             '</tr></thead><tbody>' +
             (rows.length
               ? rows.map((row) => '<tr>' + row.map((cell) => '<td>' + cell + '</td>').join("") + '</tr>').join("")
-              : '<tr><td colspan="' + headers.length + '"><span class="muted">No data</span></td></tr>') +
+              : '<tr><td colspan="' + headers.length + '"><span class="muted">' + escapeHtml(UI.common.noData) + '</span></td></tr>') +
             '</tbody></table>';
         }
 
         function renderMetrics() {
           const cards = CURRENT_USER.role === "admin"
             ? [
-                { label: "Users", value: state.users.length },
-                { label: "Domains", value: state.domains.length },
-                { label: "All Mailboxes", value: state.adminMailboxes.length },
-                { label: "All Messages", value: state.adminMessages.length },
+                { label: UI.dashboard.metricUsers, value: state.users.length },
+                { label: UI.dashboard.metricDomains, value: state.domains.length },
+                { label: UI.dashboard.allMailboxes, value: state.adminMailboxes.length },
+                { label: UI.dashboard.allMessages, value: state.adminMessages.length },
               ]
             : [
-                { label: "My Domains", value: state.domains.length },
-                { label: "My Tokens", value: state.tokens.length },
-                { label: "My Mailboxes", value: state.mailboxes.length },
-                { label: "Mailbox Messages", value: state.mailboxMessages.length },
+                { label: UI.dashboard.metricMyDomains, value: state.domains.length },
+                { label: UI.dashboard.metricMyTokens, value: state.tokens.length },
+                { label: UI.dashboard.metricMyMailboxes, value: state.mailboxes.length },
+                { label: UI.dashboard.metricMailboxMessages, value: state.mailboxMessages.length },
               ];
 
           selectors.metrics.innerHTML = cards.map((item) =>
@@ -494,13 +510,13 @@ function dashboardPageHtml(user: { email: string; role: string }) {
 
         function renderMailboxes() {
           selectors.mailboxList.innerHTML = renderTable(
-            ["Email", "Status", "Expires", "Access Link"],
+            [UI.dashboard.email, UI.dashboard.status, UI.inbox.expires, UI.dashboard.accessLink],
             state.mailboxes.map((item) => [
               '<span class="mono">' + escapeHtml(item.email_address) + '</span>',
               formatTag(item.status),
               escapeHtml(item.expires_at),
               item.encrypted_access_url
-                ? '<a class="mono" href="' + item.encrypted_access_url + '" target="_blank" rel="noreferrer">open</a>'
+                ? '<a class="mono" href="' + item.encrypted_access_url + '" target="_blank" rel="noreferrer">' + escapeHtml(UI.common.open) + '</a>'
                 : "-",
             ]),
           );
@@ -509,36 +525,38 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             '<option value="' + escapeHtml(domain.id) + '">' + escapeHtml(domain.domain) + '</option>'
           ).join("");
 
-          selectors.mailboxPicker.innerHTML = '<option value="">Select mailbox</option>' + state.mailboxes.map((item) =>
-            '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.email_address) + '</option>'
-          ).join("");
+          selectors.mailboxPicker.innerHTML =
+            '<option value="">' + escapeHtml(UI.common.selectMailbox) + '</option>' +
+            state.mailboxes.map((item) =>
+              '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.email_address) + '</option>'
+            ).join("");
         }
 
         function renderTokenList() {
           selectors.tokenList.innerHTML = renderTable(
-            ["Name", "Prefix", "Status", "Last Used", ""],
+            [UI.dashboard.name, UI.dashboard.prefix, UI.dashboard.status, UI.dashboard.lastUsed, UI.dashboard.actions],
             state.tokens.map((item) => [
               escapeHtml(item.name),
               '<span class="mono">' + escapeHtml(item.token_prefix) + '</span>',
               formatTag(item.status),
               escapeHtml(item.last_used_at || "-"),
-              '<button class="button danger" data-revoke-token="' + escapeHtml(item.id) + '">Revoke</button>',
+              '<button class="button danger" data-revoke-token="' + escapeHtml(item.id) + '">' + escapeHtml(UI.dashboard.revoke) + '</button>',
             ]),
           );
         }
 
         function renderDomainList() {
           selectors.domainList.innerHTML = renderTable(
-            ["Domain", "Type", "Status", "Assigned", "Actions"],
+            [UI.dashboard.domain, UI.dashboard.type, UI.dashboard.status, UI.dashboard.assigned, UI.dashboard.actions],
             state.domains.map((item) => [
               '<span class="mono">' + escapeHtml(item.domain) + '</span>',
-              escapeHtml(item.type),
+              formatTag(item.type),
               formatTag(item.status),
               String(item.assigned_user_count ?? 0),
               CURRENT_USER.role === "admin"
                 ? '<div class="button-row">' +
-                    '<button class="button" data-verify-domain="' + escapeHtml(item.id) + '">Mark active</button>' +
-                    '<button class="button" data-configure-domain="' + escapeHtml(item.id) + '">Configure CF</button>' +
+                    '<button class="button" data-verify-domain="' + escapeHtml(item.id) + '">' + escapeHtml(UI.dashboard.markActive) + '</button>' +
+                    '<button class="button" data-configure-domain="' + escapeHtml(item.id) + '">' + escapeHtml(UI.dashboard.configureCloudflare) + '</button>' +
                   '</div>'
                 : "-",
             ]),
@@ -562,15 +580,17 @@ function dashboardPageHtml(user: { email: string; role: string }) {
           }
 
           selectors.userList.innerHTML = renderTable(
-            ["Email", "Role", "Status", "Last Login", "Actions"],
+            [UI.dashboard.email, UI.dashboard.role, UI.dashboard.status, UI.dashboard.lastLogin, UI.dashboard.actions],
             state.users.map((item) => [
               escapeHtml(item.email),
               formatTag(item.role),
               formatTag(item.status),
               escapeHtml(item.last_login_at || "-"),
               '<div class="button-row">' +
-                '<button class="button" data-toggle-user="' + escapeHtml(item.id) + '" data-next-status="' + escapeHtml(item.status === "active" ? "disabled" : "active") + '">' + escapeHtml(item.status === "active" ? "Disable" : "Enable") + '</button>' +
-                '<button class="button danger" data-delete-user="' + escapeHtml(item.id) + '">Delete</button>' +
+                '<button class="button" data-toggle-user="' + escapeHtml(item.id) + '" data-next-status="' + escapeHtml(item.status === "active" ? "disabled" : "active") + '">' +
+                  escapeHtml(item.status === "active" ? UI.dashboard.disable : UI.dashboard.enable) +
+                '</button>' +
+                '<button class="button danger" data-delete-user="' + escapeHtml(item.id) + '">' + escapeHtml(UI.dashboard.delete) + '</button>' +
               '</div>',
             ]),
           );
@@ -578,10 +598,10 @@ function dashboardPageHtml(user: { email: string; role: string }) {
 
         function renderMailboxMessages() {
           selectors.mailboxMessages.innerHTML = renderTable(
-            ["From", "Subject", "Received", "Size", "Attachments"],
+            [UI.dashboard.from, UI.dashboard.subject, UI.dashboard.received, UI.dashboard.size, UI.dashboard.attachments],
             state.mailboxMessages.map((item) => [
               escapeHtml(item.from_address || "-"),
-              escapeHtml(item.subject || "(no subject)"),
+              escapeHtml(item.subject || UI.common.untitled),
               escapeHtml(item.received_at),
               escapeHtml(String(item.size ?? 0)),
               String(item.attachment_count || 0),
@@ -592,33 +612,35 @@ function dashboardPageHtml(user: { email: string; role: string }) {
         function renderOps() {
           const runtime = state.cloudflareStatus?.runtime || null;
           const integration = state.cloudflareStatus?.integration || null;
-          document.getElementById("cf-runtime-state").textContent =
-            runtime?.has_api_token ? "ready" : "incomplete";
+          const runtimeState = runtime?.has_api_token ? "ready" : "incomplete";
+
+          document.getElementById("cf-runtime-state").textContent = translateLabel(runtimeState);
           document.getElementById("ops-mailboxes").textContent = String(state.adminMailboxes.length);
           document.getElementById("ops-messages").textContent = String(state.adminMessages.length);
           document.getElementById("ops-audits").textContent = String(state.audits.length);
           document.getElementById("ops-tokens").textContent = String(state.adminTokens.length);
+
           selectors.opsStatus.innerHTML = runtime
-            ? '<div><strong>Runtime</strong> ' +
+            ? '<div><strong>' + escapeHtml(UI.dashboard.runtimeTitle) + '</strong> ' +
                 [
-                  ["API token", runtime.has_api_token ? "ready" : "missing"],
-                  ["Zone scope", runtime.zone_scope || "all_accessible_zones"],
-                  ["Worker", runtime.email_worker_name || "cf-temp-email"],
+                  [UI.dashboard.apiTokenLabel, translateLabel(runtime.has_api_token ? "ready" : "missing"), runtime.has_api_token ? "ready" : "missing"],
+                  [UI.dashboard.zoneScopeLabel, translateLabel(runtime.zone_scope || "all_accessible_zones"), runtime.zone_scope || "all_accessible_zones"],
+                  [UI.dashboard.workerLabel, runtime.email_worker_name || "cf-temp-email", "ready"],
                 ].map((item) =>
-                  '<span class="tag ' + tagClass(item[1] === "missing" ? "failed" : item[1]) + '">' +
+                  '<span class="tag ' + tagClass(item[2] === "missing" ? "failed" : item[2]) + '">' +
                     escapeHtml(item[0] + ": " + item[1]) +
                   '</span>'
                 ).join(" ") +
               '</div>' +
-              '<div style="margin-top:10px;"><strong>Last integration</strong> ' +
+              '<div style="margin-top:10px;"><strong>' + escapeHtml(UI.dashboard.lastIntegration) + '</strong> ' +
                 (integration
                   ? [
                       formatTag(integration.status || "unknown"),
-                      escapeHtml("domain " + (integration.domain_id || "-")),
-                      escapeHtml("zone " + (integration.zone_name || "-")),
-                      escapeHtml("updated " + (integration.updated_at || "-")),
+                      escapeHtml(UI.dashboard.domain + ": " + (integration.domain_id || "-")),
+                      escapeHtml(UI.dashboard.zone + ": " + (integration.zone_name || "-")),
+                      escapeHtml(UI.dashboard.updated + ": " + (integration.updated_at || "-")),
                     ].join(" ")
-                  : '<span class="muted">No Cloudflare integration attempts yet.</span>') +
+                  : '<span class="muted">' + escapeHtml(UI.dashboard.noIntegrationAttempts) + '</span>') +
               '</div>' +
               (integration?.last_error
                 ? '<div class="mono" style="margin-top:10px;">' + escapeHtml(integration.last_error) + '</div>'
@@ -626,9 +648,10 @@ function dashboardPageHtml(user: { email: string; role: string }) {
               (integration?.details_json
                 ? '<div class="mono" style="margin-top:10px;">' + escapeHtml(integration.details_json) + '</div>'
                 : "")
-            : "Cloudflare status unavailable";
+            : escapeHtml(UI.dashboard.cloudflareUnavailable);
+
           selectors.adminMailboxList.innerHTML = renderTable(
-            ["Mailbox", "Owner", "Domain", "Status", "Expires"],
+            [UI.dashboard.mailbox, UI.dashboard.owner, UI.dashboard.domain, UI.dashboard.status, UI.inbox.expires],
             state.adminMailboxes.map((item) => [
               '<span class="mono">' + escapeHtml(item.email_address) + '</span>',
               escapeHtml(item.user_email || "-"),
@@ -637,19 +660,21 @@ function dashboardPageHtml(user: { email: string; role: string }) {
               escapeHtml(item.expires_at || "-"),
             ]),
           );
+
           selectors.adminMessageList.innerHTML = renderTable(
-            ["To", "From", "Subject", "Received", "Size", "Owner"],
+            [UI.dashboard.to, UI.dashboard.from, UI.dashboard.subject, UI.dashboard.received, UI.dashboard.size, UI.dashboard.owner],
             state.adminMessages.map((item) => [
               '<span class="mono">' + escapeHtml(item.to_address || "-") + '</span>',
               escapeHtml(item.from_address || "-"),
-              escapeHtml(item.subject || "(no subject)"),
+              escapeHtml(item.subject || UI.common.untitled),
               escapeHtml(item.received_at || "-"),
               escapeHtml(String(item.size ?? 0)),
               escapeHtml(item.owner_email || "-"),
             ]),
           );
+
           selectors.adminTokenList.innerHTML = renderTable(
-            ["User", "Name", "Prefix", "Status", "Last Used", "Revoked", "Action"],
+            [UI.dashboard.assignUser, UI.dashboard.name, UI.dashboard.prefix, UI.dashboard.status, UI.dashboard.lastUsed, UI.dashboard.revoked, UI.dashboard.action],
             state.adminTokens.map((item) => [
               escapeHtml(item.user_email || "-"),
               escapeHtml(item.name),
@@ -658,12 +683,13 @@ function dashboardPageHtml(user: { email: string; role: string }) {
               escapeHtml(item.last_used_at || "-"),
               escapeHtml(item.revoked_at || "-"),
               item.status === "revoked"
-                ? '<span class="muted">Revoked</span>'
-                : '<button class="button danger" data-admin-revoke-token="' + escapeHtml(item.id) + '">Revoke</button>',
+                ? '<span class="muted">' + escapeHtml(translateLabel("revoked")) + '</span>'
+                : '<button class="button danger" data-admin-revoke-token="' + escapeHtml(item.id) + '">' + escapeHtml(UI.dashboard.revoke) + '</button>',
             ]),
           );
+
           selectors.auditList.innerHTML = renderTable(
-            ["Time", "Action", "Actor", "Target", "Metadata"],
+            [UI.dashboard.time, UI.dashboard.action, UI.dashboard.actor, UI.dashboard.target, UI.dashboard.metadata],
             state.audits.map((item) => [
               escapeHtml(item.created_at),
               escapeHtml(item.action),
@@ -742,7 +768,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ api_token: "" }),
             });
-            showFeedback("cloudflare-feedback", "Cloudflare token cleared");
+            showFeedback("cloudflare-feedback", UI.dashboard.cloudflareTokenCleared);
             forms.cloudflareConfig?.reset();
             await loadData();
           } catch (error) {
@@ -790,7 +816,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
                 "/admin/domains/" + configureTarget.getAttribute("data-configure-domain") + "/configure-cloudflare",
                 { method: "POST" },
               );
-              showFeedback("domain-feedback", "Cloudflare configured");
+              showFeedback("domain-feedback", UI.dashboard.cloudflareConfigured);
               selectors.opsStatus.innerHTML = '<span class="mono">' + escapeHtml(JSON.stringify(result.cloudflare)) + '</span>';
             } catch (error) {
               const steps = error.payload?.manual_steps;
@@ -837,7 +863,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
                 ttl_seconds: Number(formData.get("ttl_seconds") || 86400),
               }),
             });
-            showFeedback("mailbox-feedback", result.email_address + " created");
+            showFeedback("mailbox-feedback", result.email_address + " / " + UI.dashboard.mailboxCreated);
             forms.mailbox.reset();
             await loadData();
           } catch (error) {
@@ -858,7 +884,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             });
             selectors.tokenSecret.textContent = result.value;
             selectors.tokenSecret.className = "notice ok mono";
-            showFeedback("token-feedback", "Token created");
+            showFeedback("token-feedback", UI.dashboard.tokenCreated);
             forms.token.reset();
             await loadData();
           } catch (error) {
@@ -880,7 +906,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
                 status: formData.get("status"),
               }),
             });
-            showFeedback("domain-feedback", "Domain created");
+            showFeedback("domain-feedback", UI.dashboard.domainCreated);
             forms.domain.reset();
             await loadData();
           } catch (error) {
@@ -898,7 +924,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ domain_id: formData.get("domain_id") }),
             });
-            showFeedback("assign-feedback", "Domain assigned");
+            showFeedback("assign-feedback", UI.dashboard.domainAssigned);
             await loadData();
           } catch (error) {
             showFeedback("assign-feedback", error.message, "error");
@@ -920,7 +946,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
                 role: formData.get("role"),
               }),
             });
-            showFeedback("user-feedback", "User created");
+            showFeedback("user-feedback", UI.dashboard.userCreated);
             forms.user.reset();
             await loadData();
           } catch (error) {
@@ -940,7 +966,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
                 api_token: formData.get("api_token"),
               }),
             });
-            showFeedback("cloudflare-feedback", "Cloudflare token saved");
+            showFeedback("cloudflare-feedback", UI.dashboard.cloudflareTokenSaved);
             forms.cloudflareConfig.reset();
             await loadData();
           } catch (error) {
@@ -954,11 +980,13 @@ function dashboardPageHtml(user: { email: string; role: string }) {
   });
 }
 
-function inboxStatePageHtml(title: string, message: string) {
+function inboxStatePageHtml(title: string, message: string, locale: Locale, currentPath: string) {
   return renderDocument({
     title,
+    lang: locale,
     body: `
       <div class="inbox-shell">
+        ${languageSwitcher(currentPath, locale)}
         <section class="panel" style="max-width:640px; margin:48px auto;">
           <div class="panel-header">
             <div>
@@ -972,21 +1000,24 @@ function inboxStatePageHtml(title: string, message: string) {
   });
 }
 
-function inboxPageHtml(mailbox: Record<string, unknown>, token: string) {
+function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: Locale) {
+  const ui = getUi(locale);
   const emailAddress = String(mailbox.email_address ?? "");
   const expiresAt = String(mailbox.expires_at ?? "");
 
   return renderDocument({
-    title: `Inbox ${emailAddress}`,
+    title: locale === "en" ? `Inbox ${emailAddress}` : `收件箱 ${emailAddress}`,
+    lang: locale,
     body: `
       <div class="inbox-shell">
+        ${languageSwitcher(`/inbox/${encodeURIComponent(token)}`, locale)}
         <header class="page-header">
           <div class="page-title">
             <h1>${emailAddress}</h1>
-            <p>Expires · ${expiresAt}</p>
+            <p>${ui.inbox.expires} / ${expiresAt}</p>
           </div>
           <div class="button-row">
-            <button id="refresh-inbox" class="button">Refresh</button>
+            <button id="refresh-inbox" class="button">${ui.inbox.refresh}</button>
           </div>
         </header>
         <div id="inbox-error" class="notice error hidden"></div>
@@ -994,8 +1025,8 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string) {
           <section class="panel">
             <div class="panel-header">
               <div>
-                <h2>Messages</h2>
-                <div class="meta">Auto refresh every 30 seconds.</div>
+                <h2>${ui.inbox.messages}</h2>
+                <div class="meta">${ui.inbox.autoRefresh}</div>
               </div>
             </div>
             <div id="message-list" class="message-list"></div>
@@ -1003,18 +1034,19 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string) {
           <section class="panel">
             <div class="panel-header">
               <div>
-                <h2 id="message-subject">No message selected</h2>
+                <h2 id="message-subject">${ui.inbox.noMessageSelected}</h2>
                 <div id="message-meta" class="meta"></div>
               </div>
             </div>
             <div id="message-view" class="message-body">
-              <div class="notice">Waiting for mail.</div>
+              <div class="notice">${ui.inbox.waiting}</div>
             </div>
           </section>
         </div>
       </div>
       <script>
         const INBOX_TOKEN = ${jsonForScript(token)};
+        const UI = ${jsonForScript(ui)};
         let currentMessageId = null;
 
         function escapeHtml(value) {
@@ -1042,7 +1074,7 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string) {
           const response = await fetch(path);
           const result = await response.json().catch(() => null);
           if (!response.ok) {
-            throw new Error(result?.error?.message || "Request failed");
+            throw new Error(result?.error?.message || UI.common.requestFailed);
           }
           return result;
         }
@@ -1050,29 +1082,29 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string) {
         function renderList(messages) {
           const node = document.getElementById("message-list");
           if (!messages.length) {
-            node.innerHTML = '<div class="notice">No messages yet.</div>';
+            node.innerHTML = '<div class="notice">' + UI.inbox.noMessages + '</div>';
             return;
           }
 
           node.innerHTML = messages.map((item) =>
-            '<button class="message-item ' + (item.id === currentMessageId ? 'active' : '') + '" data-message-id="' + escapeHtml(item.id) + '">' +
-              '<div><strong>' + escapeHtml(item.subject || "(no subject)") + '</strong></div>' +
+            '<button class="message-item ' + (item.id === currentMessageId ? "active" : "") + '" data-message-id="' + escapeHtml(item.id) + '">' +
+              '<div><strong>' + escapeHtml(item.subject || UI.common.untitled) + '</strong></div>' +
               '<div class="meta">' + escapeHtml(item.from_address || "-") + '</div>' +
-              '<div class="meta">' + escapeHtml(item.received_at) + ' · ' + escapeHtml(item.size || 0) + ' bytes · ' + escapeHtml(item.attachment_count) + ' attachments</div>' +
+              '<div class="meta">' + escapeHtml(item.received_at) + ' / ' + escapeHtml(item.size || 0) + ' ' + UI.inbox.bytes + ' / ' + escapeHtml(item.attachment_count) + ' ' + UI.inbox.attachments + '</div>' +
             '</button>'
           ).join("");
         }
 
         function renderMessage(result) {
-          document.getElementById("message-subject").textContent = result.message.subject || "(no subject)";
+          document.getElementById("message-subject").textContent = result.message.subject || UI.common.untitled;
           document.getElementById("message-meta").textContent =
-            (result.message.from_address || "-") + " -> " + result.message.to_address + " · " + result.message.received_at;
+            (result.message.from_address || "-") + " -> " + result.message.to_address + " / " + result.message.received_at;
 
           const htmlBlock = result.message.html_body
-            ? '<iframe class="mail-html" sandbox srcdoc="' + String(result.message.html_body).replace(/"/g, "&quot;") + '"></iframe>'
+            ? '<div class="panel" style="padding:14px; background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid rgba(255,255,255,0.06);"><div class="meta" style="margin-bottom:10px;">' + escapeHtml(UI.inbox.htmlPreview) + '</div><iframe class="mail-html" sandbox srcdoc="' + String(result.message.html_body).replace(/"/g, "&quot;") + '"></iframe></div>'
             : "";
           const textBlock = result.message.text_body
-            ? '<pre class="notice" style="white-space:pre-wrap; margin:0;">' + escapeHtml(result.message.text_body) + '</pre>'
+            ? '<div class="panel" style="padding:14px; background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid rgba(255,255,255,0.06);"><div class="meta" style="margin-bottom:10px;">' + escapeHtml(UI.inbox.textBody) + '</div><pre class="notice" style="white-space:pre-wrap; margin:0;">' + escapeHtml(result.message.text_body) + '</pre></div>'
             : "";
           const attachments = result.message.attachments?.length
             ? '<div class="attachments">' + result.message.attachments.map((item) =>
@@ -1080,11 +1112,11 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string) {
                   escapeHtml(item.filename || item.id) +
                 '</a>'
               ).join("") + '</div>'
-            : '<div class="notice">No attachments</div>';
+            : '<div class="notice">' + UI.inbox.noAttachments + '</div>';
 
           document.getElementById("message-view").innerHTML =
             '<div class="panel" style="padding:14px; background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid rgba(255,255,255,0.06);">' +
-              '<div class="meta">Raw size · ' + escapeHtml(result.message.size || 0) + ' bytes</div>' +
+              '<div class="meta">' + UI.inbox.rawSize + ' / ' + escapeHtml(result.message.size || 0) + ' ' + UI.inbox.bytes + '</div>' +
             '</div>' +
             textBlock +
             htmlBlock +
@@ -1149,7 +1181,7 @@ webApp.get("/login", async (c) => {
   if (c.get("authUser")) {
     return redirect("/app");
   }
-  return c.html(loginPageHtml());
+  return c.html(loginPageHtml(c.get("locale") ?? "zh-CN"));
 });
 
 webApp.get("/setup", async (c) => {
@@ -1157,7 +1189,7 @@ webApp.get("/setup", async (c) => {
   if (adminCount > 0) {
     return redirect(c.get("authUser") ? "/app" : "/login");
   }
-  return c.html(setupPageHtml());
+  return c.html(setupPageHtml(c.get("locale") ?? "zh-CN"));
 });
 
 webApp.get("/app", async (c) => {
@@ -1165,7 +1197,7 @@ webApp.get("/app", async (c) => {
   if (!user) {
     return redirect("/login");
   }
-  return c.html(dashboardPageHtml(user));
+  return c.html(dashboardPageHtml(user, c.get("locale") ?? "zh-CN"));
 });
 
 webApp.get("/inbox/:encryptedToken", async (c) => {
@@ -1175,19 +1207,24 @@ webApp.get("/inbox/:encryptedToken", async (c) => {
       ip: c.get("requestIp") ?? null,
       userAgent: c.req.header("User-Agent") ?? null,
     });
-    return c.html(inboxPageHtml(mailbox, encryptedToken));
+    return c.html(inboxPageHtml(mailbox, encryptedToken, c.get("locale") ?? "zh-CN"));
   } catch (error) {
     if (!(error instanceof AppRouteError)) {
       throw error;
     }
-
+    const locale = c.get("locale") ?? "zh-CN";
+    const ui = getUi(locale);
+    const translatedMessage = translateErrorMessage(locale, error.message);
     const title =
       error.code === "MAILBOX_EXPIRED"
-        ? "Inbox expired"
+        ? ui.inbox.inboxExpired
         : error.code === "NOT_FOUND"
-          ? "Inbox unavailable"
-          : "Inbox access failed";
-    return c.html(inboxStatePageHtml(title, error.message), error.status);
+          ? ui.inbox.inboxUnavailable
+          : ui.inbox.inboxAccessFailed;
+    return c.html(
+      inboxStatePageHtml(title, translatedMessage, locale, `/inbox/${encodeURIComponent(encryptedToken)}`),
+      error.status,
+    );
   }
 });
 
