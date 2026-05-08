@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cf-temp-email",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-08",
+  "workers_dev": true,
+
+  // Runtime bindings. Resource ids/names should be finalized during
+  // Cloudflare provisioning and first deployment.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cf-temp-email-db",
+      "database_id": "TODO_D1_DATABASE_ID"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "MAIL_KV",
+      "id": "TODO_KV_NAMESPACE_ID"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "MAIL_R2",
+      "bucket_name": "cf-temp-email-mail"
+    }
+  ],
+
+  "vars": {
+    "APP_NAME": "Temp Mail",
+    "DEFAULT_MAIL_TTL_SECONDS": "86400",
+    "CLOUDFLARE_EMAIL_WORKER_NAME": "cf-temp-email",
+    "CLOUDFLARE_ACCOUNT_ID": "",
+    "CLOUDFLARE_ZONE_ID": "",
+    "CLOUDFLARE_ZONE_NAME": ""
+  },
+
+  // Required runtime secrets:
+  // - CLOUDFLARE_API_TOKEN
+  // - SESSION_SECRET
+  // - LINK_SECRET
+
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  }
+}

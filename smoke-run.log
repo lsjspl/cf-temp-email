@@ -1,0 +1,14 @@
+[smoke] apply local migrations in C:\Users\lsj\Desktop\IDEAProject\cf-temp-email\.wrangler-smoke-state\1778255410102-874
+[smoke] start wrangler dev on http://127.0.0.1:8972
+[smoke] initialize first admin
+[smoke] create and manage admin users
+[smoke] create and assign domain
+[smoke] exercise login rate limit
+[smoke] create session and API tokens
+[smoke] exercise API token rate limit
+[smoke] insert partial message fixture
+[smoke] exercise inbox rate limit
+[smoke] verify Cloudflare failure path and admin token revoke
+[smoke] insert expired mailbox and trigger scheduled cleanup
+[smoke] verify audit log and admin visibility endpoints
+[smoke] Smoke tests passed.

@@ -1,0 +1,4 @@
+SESSION_SECRET=replace-with-a-long-random-session-secret
+LINK_SECRET=replace-with-a-long-random-link-secret
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_EMAIL_WORKER_NAME=cf-temp-email
