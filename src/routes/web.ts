@@ -355,6 +355,17 @@ function dashboardPageHtml(user: { email: string; role: string }) {
                 <strong id="ops-tokens">-</strong>
               </div>
             </div>
+              <form id="cloudflare-config-form" class="field-grid" style="margin-top:16px;">
+                <div class="field">
+                  <label for="cloudflare-api-token">Cloudflare API token</label>
+                  <input id="cloudflare-api-token" class="input" name="api_token" type="password" autocomplete="off" />
+                </div>
+                <div id="cloudflare-feedback" class="notice hidden"></div>
+                <div class="button-row">
+                  <button class="button primary" type="submit">Save token</button>
+                  <button id="cloudflare-clear" class="button" type="button">Clear token</button>
+                </div>
+              </form>
               <div id="ops-status" class="notice" style="margin-top:16px;"></div>
               <div id="admin-mailbox-list" class="table-wrap" style="margin-top:16px;"></div>
               <div id="admin-message-list" class="table-wrap" style="margin-top:16px;"></div>
@@ -401,6 +412,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
           domain: document.getElementById("domain-form"),
           assign: document.getElementById("assign-form"),
           user: document.getElementById("user-form"),
+          cloudflareConfig: document.getElementById("cloudflare-config-form"),
         };
 
         function escapeHtml(value) {
@@ -589,9 +601,7 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             ? '<div><strong>Runtime</strong> ' +
                 [
                   ["API token", runtime.has_api_token ? "ready" : "missing"],
-                  ["Account", runtime.account_id_configured ? "configured" : "missing"],
-                  ["Zone ID", runtime.zone_id_configured ? "configured" : "missing"],
-                  ["Zone name", runtime.zone_name || "missing"],
+                  ["Zone scope", runtime.zone_scope || "all_accessible_zones"],
                   ["Worker", runtime.email_worker_name || "cf-temp-email"],
                 ].map((item) =>
                   '<span class="tag ' + tagClass(item[1] === "missing" ? "failed" : item[1]) + '">' +
@@ -722,6 +732,21 @@ function dashboardPageHtml(user: { email: string; role: string }) {
 
         document.getElementById("refresh-all").addEventListener("click", () => {
           loadData().catch((error) => alert(error.message));
+        });
+
+        document.getElementById("cloudflare-clear")?.addEventListener("click", async () => {
+          try {
+            await request("/admin/cloudflare/config", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ api_token: "" }),
+            });
+            showFeedback("cloudflare-feedback", "Cloudflare token cleared");
+            forms.cloudflareConfig?.reset();
+            await loadData();
+          } catch (error) {
+            showFeedback("cloudflare-feedback", error.message, "error");
+          }
         });
 
         document.getElementById("logout").addEventListener("click", async () => {
@@ -899,6 +924,26 @@ function dashboardPageHtml(user: { email: string; role: string }) {
             await loadData();
           } catch (error) {
             showFeedback("user-feedback", error.message, "error");
+          }
+        });
+
+        forms.cloudflareConfig?.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          clearFeedback("cloudflare-feedback");
+          const formData = new FormData(forms.cloudflareConfig);
+          try {
+            await request("/admin/cloudflare/config", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                api_token: formData.get("api_token"),
+              }),
+            });
+            showFeedback("cloudflare-feedback", "Cloudflare token saved");
+            forms.cloudflareConfig.reset();
+            await loadData();
+          } catch (error) {
+            showFeedback("cloudflare-feedback", error.message, "error");
           }
         });
 

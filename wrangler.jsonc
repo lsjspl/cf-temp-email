@@ -29,16 +29,11 @@
   "vars": {
     "APP_NAME": "Temp Mail",
     "DEFAULT_MAIL_TTL_SECONDS": "86400",
-    "CLOUDFLARE_EMAIL_WORKER_NAME": "cf-temp-email",
-    "CLOUDFLARE_ACCOUNT_ID": "",
-    "CLOUDFLARE_ZONE_ID": "",
-    "CLOUDFLARE_ZONE_NAME": ""
+    "CLOUDFLARE_EMAIL_WORKER_NAME": "cf-temp-email"
   },
 
-  // Required runtime secrets:
-  // - CLOUDFLARE_API_TOKEN
-  // - SESSION_SECRET
-  // - LINK_SECRET
+  // Session and inbox-link secrets are auto-generated into D1 on first use.
+  // The Cloudflare API token is configured by an admin inside the app.
 
   "triggers": {
     "crons": ["*/15 * * * *"]

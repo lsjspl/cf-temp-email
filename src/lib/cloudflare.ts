@@ -6,6 +6,13 @@ interface CloudflareEnvelope<T> {
   success: boolean;
   errors?: Array<{ code?: number; message?: string }>;
   result?: T;
+  result_info?: {
+    page?: number;
+    per_page?: number;
+    count?: number;
+    total_count?: number;
+    total_pages?: number;
+  };
 }
 
 interface EmailRoutingDnsResult {
@@ -20,55 +27,70 @@ interface CatchAllRuleResult {
   enabled?: boolean;
 }
 
+interface ZoneResult {
+  id: string;
+  name: string;
+  account?: {
+    id?: string;
+  };
+}
+
+interface ResolvedZone {
+  id: string;
+  name: string;
+  accountId: string | null;
+}
+
+const CLOUDFLARE_TOKEN_SETTING_KEY = "system:cloudflare:api_token";
+
 const MANUAL_STEPS = [
   "Open Cloudflare Email Routing for the configured zone and confirm the generated DNS records are present.",
   "Verify the catch-all rule points to the expected Worker script before sending production traffic.",
 ];
 
 function requireRuntimeConfig(env: AppEnv) {
-  const token = optionalString(env.CLOUDFLARE_API_TOKEN);
-  const zoneId = optionalString(env.CLOUDFLARE_ZONE_ID);
-  const zoneName = optionalString(env.CLOUDFLARE_ZONE_NAME)?.toLowerCase();
   const workerName =
     optionalString(env.CLOUDFLARE_EMAIL_WORKER_NAME) ?? "cf-temp-email";
 
-  if (!token || !zoneId || !zoneName) {
-    throw new AppRouteError(
-      503,
-      "CLOUDFLARE_NOT_CONFIGURED",
-      "Cloudflare runtime configuration is incomplete.",
-      {
-        manual_steps: [
-          "Set CLOUDFLARE_API_TOKEN as a runtime secret.",
-          "Set CLOUDFLARE_ZONE_ID and CLOUDFLARE_ZONE_NAME in Wrangler vars or dashboard variables.",
-        ],
-      },
-    );
-  }
-
   return {
-    token,
-    zoneId,
-    zoneName,
     workerName,
   };
 }
 
-function ensureDomainInZone(domain: string, zoneName: string) {
-  const normalized = domain.toLowerCase();
-  if (normalized !== zoneName && !normalized.endsWith(`.${zoneName}`)) {
-    throw new AppRouteError(
-      400,
-      "VALIDATION_ERROR",
-      `Domain must belong to zone ${zoneName}.`,
-      {
-        manual_steps: [
-          `Use a domain inside ${zoneName}.`,
-          "If you need a different zone, change the configured zone vars before retrying.",
-        ],
-      },
-    );
+export async function getStoredCloudflareApiToken(env: AppEnv): Promise<string | null> {
+  const row = await env.DB.prepare(
+    `
+      SELECT value
+      FROM system_settings
+      WHERE key = ?
+      LIMIT 1
+    `,
+  )
+    .bind(CLOUDFLARE_TOKEN_SETTING_KEY)
+    .first<{ value: string | null }>();
+
+  return row?.value?.trim() || null;
+}
+
+export async function setStoredCloudflareApiToken(env: AppEnv, token: string | null): Promise<void> {
+  const now = new Date().toISOString();
+
+  if (!token) {
+    await env.DB.prepare("DELETE FROM system_settings WHERE key = ?")
+      .bind(CLOUDFLARE_TOKEN_SETTING_KEY)
+      .run();
+    return;
   }
+
+  await env.DB.prepare(
+    `
+      INSERT INTO system_settings (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `,
+  )
+    .bind(CLOUDFLARE_TOKEN_SETTING_KEY, token, now)
+    .run();
 }
 
 function relativeRouteName(domain: string, zoneName: string): string {
@@ -89,7 +111,20 @@ async function cloudflareRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const { token } = requireRuntimeConfig(env);
+  const token = await getStoredCloudflareApiToken(env);
+  if (!token) {
+    throw new AppRouteError(
+      503,
+      "CLOUDFLARE_NOT_CONFIGURED",
+      "Cloudflare API token is not configured in the admin settings.",
+      {
+        manual_steps: [
+          "Open the admin Operations panel.",
+          "Save a Cloudflare API token with access to the zones you want this worker to manage.",
+        ],
+      },
+    );
+  }
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     ...init,
     headers: {
@@ -118,11 +153,91 @@ async function cloudflareRequest<T>(
   return payload.result;
 }
 
-async function enableEmailRoutingDns(env: AppEnv, domain: string) {
-  const { zoneId, zoneName } = requireRuntimeConfig(env);
-  ensureDomainInZone(domain, zoneName);
+async function listAccessibleZones(env: AppEnv): Promise<ZoneResult[]> {
+  const token = await getStoredCloudflareApiToken(env);
+  if (!token) {
+    throw new AppRouteError(
+      503,
+      "CLOUDFLARE_NOT_CONFIGURED",
+      "Cloudflare API token is not configured in the admin settings.",
+      {
+        manual_steps: [
+          "Open the admin Operations panel.",
+          "Save a Cloudflare API token with access to the zones you want this worker to manage.",
+        ],
+      },
+    );
+  }
+  const zones: ZoneResult[] = [];
+  let page = 1;
+
+  while (true) {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/zones?per_page=50&page=${page}&order=name&direction=asc`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const payload = (await response.json().catch(() => null)) as CloudflareEnvelope<ZoneResult[]> | null;
+    if (!response.ok || !payload?.success || !payload.result) {
+      const message =
+        payload?.errors?.map((item) => item.message).filter(Boolean).join("; ") ||
+        `Cloudflare API request failed with status ${response.status}.`;
+      throw new AppRouteError(502, "CLOUDFLARE_API_ERROR", message, {
+        manual_steps: MANUAL_STEPS,
+      });
+    }
+
+    zones.push(...payload.result);
+
+    const totalPages = Number(payload.result_info?.total_pages ?? 1);
+    if (!Number.isFinite(totalPages) || page >= totalPages) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return zones;
+}
+
+async function resolveZoneForDomain(env: AppEnv, domain: string): Promise<ResolvedZone> {
+  const normalized = domain.toLowerCase();
+  const zones = await listAccessibleZones(env);
+  const matches = zones
+    .map((zone) => ({ ...zone, normalizedName: zone.name.toLowerCase() }))
+    .filter((zone) => normalized === zone.normalizedName || normalized.endsWith(`.${zone.normalizedName}`))
+    .sort((left, right) => right.normalizedName.length - left.normalizedName.length);
+
+  const match = matches[0];
+  if (!match) {
+    throw new AppRouteError(
+      400,
+      "VALIDATION_ERROR",
+      "Domain does not belong to any zone accessible by the configured Cloudflare token.",
+      {
+        manual_steps: [
+          "Use a domain inside a zone that this Cloudflare token can access.",
+          "If the token should manage this zone, expand the token's zone permissions and retry.",
+        ],
+      },
+    );
+  }
+
+  return {
+    id: match.id,
+    name: match.name.toLowerCase(),
+    accountId: match.account?.id ?? null,
+  };
+}
+
+async function enableEmailRoutingDns(env: AppEnv, zone: ResolvedZone, domain: string) {
   const fullName = domain.toLowerCase();
-  const shortName = relativeRouteName(fullName, zoneName);
+  const shortName = relativeRouteName(fullName, zone.name);
   const attempts = [fullName, shortName].filter(
     (value, index, list) => value && list.indexOf(value) === index,
   );
@@ -132,7 +247,7 @@ async function enableEmailRoutingDns(env: AppEnv, domain: string) {
     try {
       return await cloudflareRequest<EmailRoutingDnsResult>(
         env,
-        `/zones/${zoneId}/email/routing/dns`,
+        `/zones/${zone.id}/email/routing/dns`,
         {
           method: "POST",
           body: JSON.stringify({ name }),
@@ -146,11 +261,11 @@ async function enableEmailRoutingDns(env: AppEnv, domain: string) {
   throw lastError;
 }
 
-async function enableCatchAllWorkerRule(env: AppEnv, domain: string) {
-  const { zoneId, workerName } = requireRuntimeConfig(env);
+async function enableCatchAllWorkerRule(env: AppEnv, zone: ResolvedZone, domain: string) {
+  const { workerName } = requireRuntimeConfig(env);
   return cloudflareRequest<CatchAllRuleResult>(
     env,
-    `/zones/${zoneId}/email/routing/rules/catch_all`,
+    `/zones/${zone.id}/email/routing/rules/catch_all`,
     {
       method: "PUT",
       body: JSON.stringify({
@@ -164,10 +279,12 @@ async function enableCatchAllWorkerRule(env: AppEnv, domain: string) {
 }
 
 export async function configureDomainWithCloudflare(env: AppEnv, domain: string) {
-  const dns = await enableEmailRoutingDns(env, domain);
-  const catchAll = await enableCatchAllWorkerRule(env, domain);
+  const zone = await resolveZoneForDomain(env, domain);
+  const dns = await enableEmailRoutingDns(env, zone, domain);
+  const catchAll = await enableCatchAllWorkerRule(env, zone, domain);
 
   return {
+    zone,
     dns,
     catch_all: catchAll,
     manual_steps: [

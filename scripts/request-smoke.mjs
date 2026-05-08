@@ -52,7 +52,7 @@ async function runSql(sql, filename) {
   await fs.mkdir(smokeStatePath, { recursive: true });
   const sqlPath = path.join(smokeStatePath, filename);
   await fs.writeFile(sqlPath, `${sql}\n`, "utf8");
-  await runCommand(npxCommand, [
+  return runCommand(npxCommand, [
     "wrangler",
     "d1",
     "execute",
@@ -87,8 +87,6 @@ async function writeDevVars() {
   await fs.writeFile(
     devVarsPath,
     [
-      "SESSION_SECRET=test-session-secret",
-      "LINK_SECRET=test-link-secret",
       "CLOUDFLARE_API_TOKEN=",
       "CLOUDFLARE_EMAIL_WORKER_NAME=cf-temp-email",
       "",
@@ -563,6 +561,13 @@ async function main() {
     assert.equal(result.response.status, 200);
     assert.equal(result.body.integration.status, "failed");
     assert.ok(result.body.integration.last_error);
+
+    const secretRows = await runSql(
+      "SELECT key, value FROM system_settings WHERE key IN ('system:secret:session', 'system:secret:link') ORDER BY key;",
+      `verify-secrets-${suffix}.sql`,
+    );
+    assert.ok(secretRows.stdout.includes("system:secret:link"));
+    assert.ok(secretRows.stdout.includes("system:secret:session"));
 
     const sanitized = sanitizeHtmlPreview(
       '<div onclick="evil()"><script>alert(1)</script><a href="javascript:alert(1)">x</a><form>bad</form><p>ok</p></div>',

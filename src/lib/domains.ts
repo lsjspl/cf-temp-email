@@ -1,5 +1,5 @@
 import { generateId } from "./crypto";
-import { configureDomainWithCloudflare } from "./cloudflare";
+import { configureDomainWithCloudflare, getStoredCloudflareApiToken } from "./cloudflare";
 import { AppRouteError } from "./errors";
 import { optionalString, requireString } from "./request";
 import type { AppEnv } from "../types/env";
@@ -13,28 +13,12 @@ function normalizeDomain(domain: string): string {
   return normalized;
 }
 
-function validateDomainScope(env: AppEnv, domain: string): void {
-  const zoneName = optionalString(env.CLOUDFLARE_ZONE_NAME)?.toLowerCase();
-  if (!zoneName) {
-    return;
-  }
-
-  if (domain !== zoneName && !domain.endsWith(`.${zoneName}`)) {
-    throw new AppRouteError(
-      400,
-      "VALIDATION_ERROR",
-      `domain must belong to configured zone ${zoneName}.`,
-    );
-  }
-}
-
 export async function createDomainRecord(
   env: AppEnv,
   payload: Record<string, unknown>,
   actorUserId?: string,
 ) {
   const domain = normalizeDomain(requireString(payload.domain, "domain"));
-  validateDomainScope(env, domain);
 
   const type = optionalString(payload.type) ?? "subdomain";
   const status = optionalString(payload.status) ?? "pending";
@@ -70,7 +54,7 @@ export async function createDomainRecord(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
-      .bind(id, domain, type, env.CLOUDFLARE_ZONE_ID ?? null, status, actorUserId ?? null, now, now)
+      .bind(id, domain, type, null, status, actorUserId ?? null, now, now)
       .run();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE")) {
@@ -196,8 +180,6 @@ export async function markDomainVerified(env: AppEnv, domainId: string) {
     throw new AppRouteError(404, "NOT_FOUND", "Domain not found.");
   }
 
-  validateDomainScope(env, domain.domain);
-
   await env.DB.prepare(
     `
       UPDATE domains
@@ -233,12 +215,9 @@ export async function getCloudflareStatus(env: AppEnv) {
 
   return {
     runtime: {
-      has_api_token: Boolean(optionalString(env.CLOUDFLARE_API_TOKEN)),
+      has_api_token: Boolean(await getStoredCloudflareApiToken(env)),
       email_worker_name: optionalString(env.CLOUDFLARE_EMAIL_WORKER_NAME) ?? "cf-temp-email",
-      account_id_configured: Boolean(optionalString(env.CLOUDFLARE_ACCOUNT_ID)),
-      zone_id_configured: Boolean(optionalString(env.CLOUDFLARE_ZONE_ID)),
-      zone_name_configured: Boolean(optionalString(env.CLOUDFLARE_ZONE_NAME)),
-      zone_name: optionalString(env.CLOUDFLARE_ZONE_NAME),
+      zone_scope: "all_accessible_zones",
     },
     integration: integration ?? null,
   };
@@ -270,13 +249,14 @@ export async function configureDomainRuntime(env: AppEnv, domainId: string) {
         `
           UPDATE domains
           SET
+            zone_id = ?,
             status = 'active',
             cloudflare_rule_id = ?,
             cloudflare_dns_record_id = ?,
             updated_at = ?
           WHERE id = ?
         `,
-      ).bind(catchAllId, dnsRecordId, new Date().toISOString(), domainId),
+      ).bind(result.zone.id, catchAllId, dnsRecordId, new Date().toISOString(), domainId),
       env.DB.prepare(
         `
           INSERT INTO cloudflare_integrations (
@@ -296,9 +276,9 @@ export async function configureDomainRuntime(env: AppEnv, domainId: string) {
       ).bind(
         generateId("cfi"),
         domainId,
-        optionalString(env.CLOUDFLARE_ACCOUNT_ID),
-        optionalString(env.CLOUDFLARE_ZONE_ID),
-        optionalString(env.CLOUDFLARE_ZONE_NAME),
+        result.zone.accountId,
+        result.zone.id,
+        result.zone.name,
         JSON.stringify(result),
         new Date().toISOString(),
         new Date().toISOString(),
@@ -340,9 +320,9 @@ export async function configureDomainRuntime(env: AppEnv, domainId: string) {
       .bind(
         generateId("cfi"),
         domainId,
-        optionalString(env.CLOUDFLARE_ACCOUNT_ID),
-        optionalString(env.CLOUDFLARE_ZONE_ID),
-        optionalString(env.CLOUDFLARE_ZONE_NAME),
+        null,
+        null,
+        null,
         message,
         new Date().toISOString(),
         new Date().toISOString(),

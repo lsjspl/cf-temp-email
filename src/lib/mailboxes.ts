@@ -1,6 +1,7 @@
 import { encryptJsonToken, generateId, randomLocalPart, sha256Hex } from "./crypto";
 import { AppRouteError } from "./errors";
 import { optionalString, requireString } from "./request";
+import { getLinkSecret } from "./runtime-secrets";
 import type { AppEnv } from "../types/env";
 
 interface DomainRow {
@@ -154,7 +155,7 @@ export async function createMailbox(
       expiresAt,
       nonce: generateId("nonce"),
     },
-    env.LINK_SECRET,
+    await getLinkSecret(env),
   );
   const tokenHash = await sha256Hex(encryptedToken);
 

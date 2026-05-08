@@ -4,6 +4,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { generateId, generateOpaqueToken, hashPassword, sha256Hex, verifyPassword } from "./crypto";
 import { AppRouteError, errorResponse } from "./errors";
 import { optionalString, requireString, validateEmailAddress, validatePassword } from "./request";
+import { getSessionSecret } from "./runtime-secrets";
 import type { AppSchema, AuthMode } from "../types/app";
 import type { AuthUser, UserRole, UserStatus } from "../types/auth";
 import type { AppEnv } from "../types/env";
@@ -52,8 +53,10 @@ function mapUser(row: Pick<UserRow, "id" | "email" | "username" | "role" | "stat
   };
 }
 
-function sessionCacheKey(sessionId: string): string {
-  return `session:${sessionId}`;
+async function sessionCacheKey(env: AppEnv, sessionId: string): Promise<string> {
+  const secret = await getSessionSecret(env);
+  const hashed = await sha256Hex(`${secret}:${sessionId}`);
+  return `session:${hashed}`;
 }
 
 export function getAuthUser(c: { get: (key: "authUser") => AuthUser | undefined }): AuthUser | undefined {
@@ -279,7 +282,7 @@ export async function createSession(c: {
     expiresAt,
   };
 
-  await c.env.MAIL_KV.put(sessionCacheKey(sessionId), JSON.stringify(sessionRecord), {
+  await c.env.MAIL_KV.put(await sessionCacheKey(c.env, sessionId), JSON.stringify(sessionRecord), {
     expirationTtl: SESSION_TTL_SECONDS,
   });
 
@@ -302,7 +305,7 @@ export async function destroySession(c: {
 }): Promise<void> {
   const sessionId = c.get("sessionId");
   if (sessionId) {
-    await c.env.MAIL_KV.delete(sessionCacheKey(sessionId));
+    await c.env.MAIL_KV.delete(await sessionCacheKey(c.env, sessionId));
   }
 
   deleteCookie(c as never, SESSION_COOKIE_NAME, {
@@ -401,7 +404,7 @@ export const loadSessionUser: MiddlewareHandler<AppSchema> = async (c, next) => 
     return;
   }
 
-  const rawSession = await c.env.MAIL_KV.get(sessionCacheKey(sessionId));
+  const rawSession = await c.env.MAIL_KV.get(await sessionCacheKey(c.env, sessionId));
   if (!rawSession) {
     deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
     await next();
@@ -411,7 +414,7 @@ export const loadSessionUser: MiddlewareHandler<AppSchema> = async (c, next) => 
   try {
     const session = JSON.parse(rawSession) as SessionRecord;
     if (new Date(session.expiresAt).getTime() <= Date.now()) {
-      await c.env.MAIL_KV.delete(sessionCacheKey(sessionId));
+      await c.env.MAIL_KV.delete(await sessionCacheKey(c.env, sessionId));
       deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
       await next();
       return;
@@ -419,7 +422,7 @@ export const loadSessionUser: MiddlewareHandler<AppSchema> = async (c, next) => 
 
     const user = await getUserById(c.env, session.userId);
     if (!user || user.status !== "active") {
-      await c.env.MAIL_KV.delete(sessionCacheKey(sessionId));
+      await c.env.MAIL_KV.delete(await sessionCacheKey(c.env, sessionId));
       deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
       await next();
       return;
@@ -429,7 +432,7 @@ export const loadSessionUser: MiddlewareHandler<AppSchema> = async (c, next) => 
     c.set("sessionId", sessionId);
     c.set("authMode", "session");
   } catch {
-    await c.env.MAIL_KV.delete(sessionCacheKey(sessionId));
+    await c.env.MAIL_KV.delete(await sessionCacheKey(c.env, sessionId));
     deleteCookie(c, SESSION_COOKIE_NAME, { path: "/" });
   }
 

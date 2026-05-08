@@ -5,10 +5,6 @@ export interface AppEnv {
   APP_NAME: string;
   DEFAULT_MAIL_TTL_SECONDS: string;
   CLOUDFLARE_EMAIL_WORKER_NAME?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-  CLOUDFLARE_ZONE_ID?: string;
-  CLOUDFLARE_ZONE_NAME?: string;
-  CLOUDFLARE_API_TOKEN?: string;
-  SESSION_SECRET: string;
-  LINK_SECRET: string;
+  SESSION_SECRET?: string;
+  LINK_SECRET?: string;
 }

@@ -2,6 +2,7 @@ import { decryptJsonToken } from "./crypto";
 import { AppRouteError } from "./errors";
 import { sanitizeHtmlPreview } from "./mail-sanitize";
 import { writeAuditLog } from "./audit";
+import { getLinkSecret } from "./runtime-secrets";
 import type { AppEnv } from "../types/env";
 
 interface InboxTokenPayload {
@@ -48,7 +49,7 @@ export async function validateInboxAccessToken(
 
   let payload: InboxTokenPayload;
   try {
-    payload = await decryptJsonToken<InboxTokenPayload>(encryptedToken, env.LINK_SECRET);
+    payload = await decryptJsonToken<InboxTokenPayload>(encryptedToken, await getLinkSecret(env));
   } catch {
     if (auditContext) {
       await writeAuditLog(env, {

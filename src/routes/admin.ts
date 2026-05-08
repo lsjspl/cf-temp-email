@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { createUser, deleteUserById, listAllApiTokens, requireAuthUser, revokeApiToken, updateUser } from "../lib/auth";
 import { getAuditContext, writeAuditLog } from "../lib/audit";
+import { setStoredCloudflareApiToken } from "../lib/cloudflare";
 import {
   assignDomainToUser,
   configureDomainRuntime,
@@ -12,7 +13,7 @@ import {
   removeDomainFromUser,
 } from "../lib/domains";
 import { AppRouteError } from "../lib/errors";
-import { readJsonBody } from "../lib/request";
+import { optionalString, readJsonBody } from "../lib/request";
 import type { AppSchema } from "../types/app";
 
 const adminApp = new Hono<AppSchema>();
@@ -330,6 +331,29 @@ adminApp.get("/admin/audit-logs", async (c) => {
 
 adminApp.get("/admin/cloudflare/status", async (c) => {
   return c.json(await getCloudflareStatus(c.env));
+});
+
+adminApp.post("/admin/cloudflare/config", async (c) => {
+  const actor = requireAuthUser(c);
+  const payload = await readJsonBody<Record<string, unknown>>(c);
+  const apiToken = optionalString(payload.api_token);
+
+  await setStoredCloudflareApiToken(c.env, apiToken);
+  await writeAuditLog(c.env, {
+    ...getAuditContext(c),
+    actorUserId: actor.id,
+    action: "admin.cloudflare.config.updated",
+    targetType: "cloudflare_config",
+    targetId: "api_token",
+    metadata: {
+      api_token_configured: Boolean(apiToken),
+    },
+  });
+
+  return c.json({
+    success: true,
+    api_token_configured: Boolean(apiToken),
+  });
 });
 
 export default adminApp;
