@@ -9,6 +9,7 @@ import {
   touchApiTokenUsage,
 } from "./lib/auth";
 import { writeAuditLog } from "./lib/audit";
+import { ensureDatabaseReady } from "./lib/db-bootstrap";
 import { runCleanup } from "./lib/cleanup";
 import { processInboundEmail } from "./lib/email";
 import { AppRouteError, errorResponse } from "./lib/errors";
@@ -25,6 +26,10 @@ import type { AppEnv } from "./types/env";
 
 const app = new Hono<AppSchema>();
 
+app.use("*", async (c, next) => {
+  await ensureDatabaseReady(c.env);
+  await next();
+});
 app.use("*", attachRequestMetadata);
 app.use("*", loadSessionUser);
 app.use("/auth/login", loginRateLimit());
@@ -97,10 +102,12 @@ async function handleIncomingEmail(
   env: AppEnv,
   message: ForwardableEmailMessage,
 ): Promise<void> {
+  await ensureDatabaseReady(env);
   await processInboundEmail(env, message);
 }
 
 async function runScheduledCleanup(env: AppEnv): Promise<void> {
+  await ensureDatabaseReady(env);
   const summary = await runCleanup(env);
   await writeAuditLog(env, {
     action: "system.cleanup.completed",

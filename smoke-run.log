@@ -1,9 +1,14 @@
-[smoke] apply local migrations in C:\Users\lsj\Desktop\IDEAProject\cf-temp-email\.wrangler-smoke-state\1778256931555-286
-[smoke] start wrangler dev on http://127.0.0.1:8791
+[smoke] apply local migrations in C:\Users\lsj\Desktop\IDEAProject\cf-temp-email\.wrangler-smoke-state\1778259335067-446
+[smoke] start wrangler dev on http://127.0.0.1:8958
 [smoke] initialize first admin
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-
-500 !== 200
-
-    at main (file:///C:/Users/lsj/Desktop/IDEAProject/cf-temp-email/scripts/request-smoke.mjs:251:12)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[smoke] create and manage admin users
+[smoke] create and assign domain
+[smoke] exercise login rate limit
+[smoke] create session and API tokens
+[smoke] exercise API token rate limit
+[smoke] insert partial message fixture
+[smoke] exercise inbox rate limit
+[smoke] verify Cloudflare failure path and admin token revoke
+[smoke] insert expired mailbox and trigger scheduled cleanup
+[smoke] verify audit log and admin visibility endpoints
+[smoke] Smoke tests passed.

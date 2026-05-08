@@ -25,6 +25,16 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function alignToFixedWindow(windowSeconds) {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const remainder = nowSeconds % windowSeconds;
+  if (remainder <= 2) {
+    return;
+  }
+
+  await delay((windowSeconds - remainder + 1) * 1000);
+}
+
 function logStep(message) {
   const line = `[smoke] ${message}`;
   console.log(line);
@@ -417,6 +427,7 @@ async function main() {
     assert.equal(result.response.status, 200);
 
     logStep("exercise API token rate limit");
+    await alignToFixedWindow(60);
     let lastMailbox = null;
     for (let index = 0; index < 121; index += 1) {
       result = await requestJson(
@@ -486,6 +497,7 @@ async function main() {
     assert.ok((await htmlResponse.text()).includes("Inbox unavailable"));
 
     logStep("exercise inbox rate limit");
+    await alignToFixedWindow(60);
     for (let index = 0; index < 121; index += 1) {
       result = await requestJson(
         `/inbox/${encryptedToken}/messages`,
