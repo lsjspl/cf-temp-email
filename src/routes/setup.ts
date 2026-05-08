@@ -17,7 +17,13 @@ setupApp.get("/setup/status", async (c) => {
 setupApp.post("/setup/initialize", async (c) => {
   const payload = await readJsonBody<Record<string, unknown>>(c);
   const admin = await initializeAdmin(c.env, payload);
-  await createSession(c, admin);
+  let nextPath = "/app";
+  try {
+    await createSession(c, admin);
+  } catch (error) {
+    console.error("Failed to create initial admin session", error);
+    nextPath = "/login";
+  }
   await writeAuditLog(c.env, {
     ...getAuditContext(c),
     action: "setup.initial_admin.created",
@@ -31,6 +37,7 @@ setupApp.post("/setup/initialize", async (c) => {
 
   return c.json({
     user: admin,
+    next_path: nextPath,
   });
 });
 

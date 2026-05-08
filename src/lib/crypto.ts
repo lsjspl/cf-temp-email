@@ -104,7 +104,10 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  const iterations = 120_000;
+  // Cloudflare Workers request CPU is tighter than a typical server process.
+  // Keep PBKDF2 strong enough for this app while avoiding setup/login 500s
+  // from CPU exhaustion on first-run and login requests.
+  const iterations = 30_000;
   const salt = toBase64Url(randomBytes(16));
   const derivedBits = await derivePasswordBits(password, salt, iterations);
   return `pbkdf2_sha256$${iterations}$${salt}$${bytesToHex(derivedBits)}`;

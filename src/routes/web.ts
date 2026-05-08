@@ -129,7 +129,8 @@ function setupPageHtml() {
             errorNode.classList.remove("hidden");
             return;
           }
-          location.href = "/app";
+          const result = await response.json().catch(() => null);
+          location.href = result?.next_path || "/app";
         });
       </script>
     `,
