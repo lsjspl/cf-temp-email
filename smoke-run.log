@@ -1,5 +1,5 @@
-[smoke] apply local migrations in C:\Users\lsj\Desktop\IDEAProject\cf-temp-email\.wrangler-smoke-state\1778262891879-45
-[smoke] start wrangler dev on http://127.0.0.1:8840
+[smoke] apply local migrations in C:\Users\lsj\Desktop\IDEAProject\cf-temp-email\.wrangler-smoke-state\1778263769210-318
+[smoke] start wrangler dev on http://127.0.0.1:8815
 [smoke] initialize first admin
 [smoke] create and manage admin users
 [smoke] create and assign domain

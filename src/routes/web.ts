@@ -391,7 +391,8 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
         const UI = ${jsonForScript(ui)};
         const state = {
           users: [],
-          domains: [],
+          userDomains: [],
+          allDomains: [],
           tokens: [],
           mailboxes: [],
           mailboxMessages: [],
@@ -492,12 +493,12 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
           const cards = CURRENT_USER.role === "admin"
             ? [
                 { label: UI.dashboard.metricUsers, value: state.users.length },
-                { label: UI.dashboard.metricDomains, value: state.domains.length },
+                { label: UI.dashboard.metricDomains, value: state.allDomains.length },
                 { label: UI.dashboard.allMailboxes, value: state.adminMailboxes.length },
                 { label: UI.dashboard.allMessages, value: state.adminMessages.length },
               ]
             : [
-                { label: UI.dashboard.metricMyDomains, value: state.domains.length },
+                { label: UI.dashboard.metricMyDomains, value: state.userDomains.length },
                 { label: UI.dashboard.metricMyTokens, value: state.tokens.length },
                 { label: UI.dashboard.metricMyMailboxes, value: state.mailboxes.length },
                 { label: UI.dashboard.metricMailboxMessages, value: state.mailboxMessages.length },
@@ -521,7 +522,7 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
             ]),
           );
 
-          document.getElementById("mailbox-domain").innerHTML = state.domains.map((domain) =>
+          document.getElementById("mailbox-domain").innerHTML = state.userDomains.map((domain) =>
             '<option value="' + escapeHtml(domain.id) + '">' + escapeHtml(domain.domain) + '</option>'
           ).join("");
 
@@ -546,9 +547,10 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
         }
 
         function renderDomainList() {
+          const visibleDomains = CURRENT_USER.role === "admin" ? state.allDomains : state.userDomains;
           selectors.domainList.innerHTML = renderTable(
             [UI.dashboard.domain, UI.dashboard.type, UI.dashboard.status, UI.dashboard.assigned, UI.dashboard.actions],
-            state.domains.map((item) => [
+            visibleDomains.map((item) => [
               '<span class="mono">' + escapeHtml(item.domain) + '</span>',
               formatTag(item.type),
               formatTag(item.status),
@@ -564,7 +566,7 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
 
           const assignDomain = document.getElementById("assign-domain");
           if (assignDomain) {
-            assignDomain.innerHTML = state.domains
+            assignDomain.innerHTML = state.allDomains
               .filter((item) => item.status === "active")
               .map((item) => '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.domain) + '</option>')
               .join("");
@@ -717,13 +719,15 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
             request("/user/api-tokens"),
             request("/user/mailboxes"),
           ]);
-          state.domains = domains.domains;
+          state.userDomains = domains.domains;
           state.tokens = tokens.tokens;
           state.mailboxes = mailboxes.mailboxes;
+          state.allDomains = CURRENT_USER.role === "admin" ? state.allDomains : state.userDomains;
 
           if (CURRENT_USER.role === "admin") {
-            const [users, adminMailboxes, adminMessages, adminTokens, audits, cloudflareStatus] = await Promise.all([
+            const [users, adminDomains, adminMailboxes, adminMessages, adminTokens, audits, cloudflareStatus] = await Promise.all([
               request("/admin/users"),
+              request("/admin/domains"),
               request("/admin/mailboxes"),
               request("/admin/messages"),
               request("/admin/api-tokens"),
@@ -731,6 +735,7 @@ function dashboardPageHtml(user: { email: string; role: string }, locale: Locale
               request("/admin/cloudflare/status"),
             ]);
             state.users = users.users;
+            state.allDomains = adminDomains.domains;
             state.adminMailboxes = adminMailboxes.mailboxes;
             state.adminMessages = adminMessages.messages;
             state.adminTokens = adminTokens.tokens;

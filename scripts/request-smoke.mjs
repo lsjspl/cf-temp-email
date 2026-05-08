@@ -342,6 +342,14 @@ async function main() {
     assert.equal(result.response.status, 201);
     const domainId = result.body.domain.id;
 
+    result = await requestJson("/admin/domains", { method: "GET" }, adminJar, "198.51.100.11");
+    assert.equal(result.response.status, 200);
+    assert.ok(result.body.domains.some((item) => item.id === domainId));
+
+    result = await requestJson(`/admin/users/${userId}/domains`, { method: "GET" }, adminJar, "198.51.100.11");
+    assert.equal(result.response.status, 200);
+    assert.ok(!result.body.domains.some((item) => item.id === domainId));
+
     result = await requestJson(
       `/admin/users/${userId}/domains`,
       {
