@@ -4,6 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-05-08",
   "workers_dev": true,
+  "assets": {
+    "directory": "public",
+    "not_found_handling": "single-page-application", "binding": "ASSETS"
+  },
 
   // Runtime bindings. Wrangler can auto-provision these resources on
   // local dev and deploy, then write back the generated ids.

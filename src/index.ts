@@ -22,7 +22,6 @@ import authApp from "./routes/auth";
 import externalApiApp from "./routes/external-api";
 import setupApp from "./routes/setup";
 import userApp from "./routes/user";
-import webApp from "./routes/web";
 import type { AppSchema } from "./types/app";
 import type { AppEnv } from "./types/env";
 
@@ -38,7 +37,6 @@ app.use("*", loadSessionUser);
 app.use("/auth/login", loginRateLimit());
 app.use("/inbox/*", inboxRateLimit());
 
-app.route("/", webApp);
 app.route("/", setupApp);
 app.route("/", authApp);
 
@@ -93,7 +91,22 @@ app.get("/inbox/:encryptedToken/attachments/:attachmentId", async (c) => {
   });
 });
 
-app.notFound((c) => errorResponse(c, 404, "NOT_FOUND", "Not Found"));
+app.notFound((c) => {
+  // API 路径返回 JSON 404
+  const path = new URL(c.req.url).pathname;
+  if (
+    path.startsWith("/auth/") ||
+    path.startsWith("/admin/") ||
+    path.startsWith("/user/") ||
+    path.startsWith("/api/") ||
+    path.startsWith("/setup/") ||
+    (path.startsWith("/inbox/") && path.includes("/messages"))
+  ) {
+    return errorResponse(c, 404, "NOT_FOUND", "Not Found");
+  }
+  // 其他路径交给 assets（SPA fallback）
+  return c.env.ASSETS.fetch(c.req.raw);
+});
 
 app.onError((err, c) => {
   if (err instanceof AppRouteError) {

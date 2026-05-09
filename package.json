@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev:frontend": "cd frontend && npx vite",
+    "build:frontend": "cd frontend && npm run build",
+    "deploy": "cd frontend && npm run build && cd .. && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "deploy:worker": "wrangler deploy",

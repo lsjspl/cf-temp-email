@@ -273,6 +273,9 @@ function loginPageHtml(locale: Locale) {
         <section class="auth-card">
           ${languageSwitcher("/login", locale)}
           <div class="auth-header">
+            <div style="text-align:center; margin-bottom:12px;">
+              <img src="/logo.png" alt="logo" width="48" height="48" style="border-radius:6px;" />
+            </div>
             <h1>${ui.login.heading}</h1>
             <p>${ui.login.subtitle}</p>
           </div>
@@ -506,7 +509,10 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
       <div class="shell">
         <header class="page-header">
           <div class="page-title">
-            <h1>${ui.dashboard.title}</h1>
+            <h1 style="display:flex; align-items:center; gap:10px;">
+              <img src="/logo.png" alt="logo" width="32" height="32" style="flex-shrink:0; border-radius:4px;" />
+              ${ui.dashboard.title}
+            </h1>
             <p>
               <span class="tag ${user.role === "admin" ? "good" : ""}">${roleLabel}</span>
               <span class="mono" style="margin-left:8px;">${user.email}</span>
@@ -2011,7 +2017,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             
             const checkboxList = activeDomains.map((d) => {
               const checked = assignedDomainIds.has(d.id) ? " checked" : "";
-              return '<label style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer; transition:background 140ms;" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'transparent\'">' +
+              return '<label class="checkbox-row">' +
                 '<input type="checkbox" value="' + escapeAttr(d.id) + '" class="domain-checkbox"' + checked + ' style="width:16px; height:16px; accent-color:var(--accent);" />' +
                 '<span class="mono" style="font-size:13px;">' + escapeHtml(d.domain) + '</span>' +
               '</label>';

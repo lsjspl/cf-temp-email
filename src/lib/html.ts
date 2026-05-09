@@ -26,6 +26,7 @@ export function renderDocument(options: {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/logo.png" />
     <title>${escapeHtml(options.title)}</title>
     <style>
       :root {
@@ -1000,6 +1001,20 @@ export function renderDocument(options: {
       .dropdown-item.danger:hover {
         background: rgba(255, 125, 125, 0.16);
         color: var(--danger);
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 140ms;
+      }
+
+      .checkbox-row:hover {
+        background: rgba(255, 255, 255, 0.04);
       }
 
       .pagination {
