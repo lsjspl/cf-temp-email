@@ -631,6 +631,19 @@ export function renderDocument(options: {
         vertical-align: middle;
       }
 
+      .message-item .new-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 600;
+        background: rgba(143, 247, 194, 0.18);
+        color: var(--accent);
+        border: 1px solid rgba(143, 247, 194, 0.3);
+        margin-left: 6px;
+      }
+
       .message-body {
         display: grid;
         gap: 12px;
@@ -644,6 +657,7 @@ export function renderDocument(options: {
         border-radius: 6px;
         overflow: hidden;
         border: 0;
+        transition: height 200ms ease;
       }
 
       .attachments {
@@ -967,6 +981,8 @@ export function renderDocument(options: {
           grid-auto-columns: max-content;
           overflow-x: auto;
           scrollbar-width: thin;
+          -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+          mask-image: linear-gradient(to right, black 90%, transparent 100%);
         }
 
         .nav-button {
@@ -987,10 +1003,102 @@ export function renderDocument(options: {
           left: 12px;
           max-width: none;
         }
+
+        table {
+          min-width: unset;
+        }
+
+        .table-wrap.mobile-cards table,
+        .table-wrap.mobile-cards thead {
+          display: none;
+        }
+
+        .table-wrap.mobile-cards {
+          border: 0;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
         * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+      }
+
+      /* Ops sub-tabs */
+      .ops-tabs {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 8px;
+      }
+
+      .ops-tab {
+        background: transparent;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 14px;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 140ms ease, color 140ms ease;
+      }
+
+      .ops-tab:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      .ops-tab.active {
+        background: rgba(143, 247, 194, 0.12);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .ops-tab-content {
+        display: none;
+      }
+
+      .ops-tab-content.active {
+        display: block;
+      }
+
+      /* Shortcut hint */
+      .shortcut-bar {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 8px 14px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--line);
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .shortcut-bar .shortcut-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* Time relative display */
+      .time-relative {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .time-relative .time-abs {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .time-relative .time-rel {
+        font-size: 11px;
+        color: var(--muted);
+        opacity: 0.75;
       }
     </style>
     ${options.head ?? ""}

@@ -42,6 +42,14 @@ function clientRuntimeScript(ui: unknown): string {
       if (!message) return;
       const stack = document.getElementById("toast-stack");
       if (!stack) return;
+      // 错误类型使用 role="alert" 确保屏幕阅读器立即播报
+      if (kind === "error") {
+        stack.setAttribute("role", "alert");
+        stack.setAttribute("aria-live", "assertive");
+      } else {
+        stack.setAttribute("role", "status");
+        stack.setAttribute("aria-live", "polite");
+      }
       const node = document.createElement("div");
       node.className = "toast " + kind;
       const icon = kind === "ok" ? "✓" : kind === "error" ? "!" : kind === "warn" ? "⚠" : "i";
@@ -91,18 +99,35 @@ function clientRuntimeScript(ui: unknown): string {
         backdrop.querySelector('[data-action="cancel"]').textContent = opts.cancelText;
         backdrop.querySelector('[data-action="confirm"]').textContent = opts.confirmText;
         document.body.appendChild(backdrop);
+        const card = backdrop.querySelector(".modal-card");
         const confirmBtn = backdrop.querySelector('[data-action="confirm"]');
         confirmBtn.focus();
         const cleanup = (value) => {
           document.removeEventListener("keydown", onKey);
+          document.removeEventListener("keydown", trapFocus);
           backdrop.remove();
           resolve(value);
+        };
+        // Focus trap: keep Tab within the modal
+        const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        const trapFocus = (event) => {
+          if (event.key !== "Tab") return;
+          const focusable = Array.from(card.querySelectorAll(focusableSelector));
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey) {
+            if (document.activeElement === first) { event.preventDefault(); last.focus(); }
+          } else {
+            if (document.activeElement === last) { event.preventDefault(); first.focus(); }
+          }
         };
         const onKey = (event) => {
           if (event.key === "Escape") cleanup(false);
           if (event.key === "Enter" && document.activeElement !== backdrop.querySelector('[data-action="cancel"]')) cleanup(true);
         };
         document.addEventListener("keydown", onKey);
+        document.addEventListener("keydown", trapFocus);
         backdrop.addEventListener("click", (event) => {
           if (event.target === backdrop) cleanup(false);
         });
@@ -201,6 +226,40 @@ function clientRuntimeScript(ui: unknown): string {
       btn.innerHTML = '<span class="spinner" aria-hidden="true"></span><span class="button-label"></span>';
       btn.querySelector(".button-label").textContent = label;
     });
+
+    // --- Time formatting helpers -------------------------------------------
+    window.formatLocalTime = function formatLocalTime(isoString) {
+      if (!isoString) return "-";
+      try {
+        const d = new Date(isoString);
+        if (Number.isNaN(d.getTime())) return isoString;
+        return d.toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+      } catch (e) { return isoString; }
+    };
+
+    window.formatRelativeTime = function formatRelativeTime(isoString) {
+      if (!isoString) return "";
+      try {
+        const d = new Date(isoString);
+        if (Number.isNaN(d.getTime())) return "";
+        const diff = Date.now() - d.getTime();
+        const absDiff = Math.abs(diff);
+        const isFuture = diff < 0;
+        if (absDiff < 60000) return isFuture ? "即将" : "刚刚";
+        if (absDiff < 3600000) { const m = Math.floor(absDiff / 60000); return isFuture ? m + "m later" : m + "m ago"; }
+        if (absDiff < 86400000) { const h = Math.floor(absDiff / 3600000); return isFuture ? h + "h later" : h + "h ago"; }
+        const days = Math.floor(absDiff / 86400000);
+        return isFuture ? days + "d later" : days + "d ago";
+      } catch (e) { return ""; }
+    };
+
+    window.formatTimeCell = function formatTimeCell(isoString) {
+      if (!isoString) return "-";
+      const local = window.formatLocalTime(isoString);
+      const rel = window.formatRelativeTime(isoString);
+      if (!rel) return local;
+      return '<span class="time-relative"><span class="time-abs">' + local + '</span><span class="time-rel">' + rel + '</span></span>';
+    };
   `;
 }
 
@@ -290,14 +349,11 @@ function loginPageHtml(locale: Locale) {
                 const result = await response.json().catch(() => null);
                 const message = result?.error?.message ?? __UI__.login.failed;
                 setError(message);
-                window.toast(message, "error");
                 return;
               }
-              window.toast("✓", "ok", 900);
               location.href = "/app";
             } catch (error) {
               setError(error.message || __UI__.login.failed);
-              window.toast(error.message || __UI__.login.failed, "error");
             }
           });
         });
@@ -339,6 +395,13 @@ function setupPageHtml(locale: Locale) {
                   <button type="button" class="password-toggle" data-password-toggle="password" aria-pressed="false">${ui.common.show}</button>
                 </div>
               </div>
+              <div class="field">
+                <label for="confirm-password">${ui.setup.confirmPassword}</label>
+                <div class="password-wrap">
+                  <input id="confirm-password" name="confirm_password" class="input" type="password" autocomplete="new-password" minlength="8" placeholder="${ui.setup.confirmPasswordPlaceholder}" required />
+                  <button type="button" class="password-toggle" data-password-toggle="confirm-password" aria-pressed="false">${ui.common.show}</button>
+                </div>
+              </div>
               <div id="setup-error" class="notice error hidden" role="alert"></div>
               <div class="button-row">
                 <button id="setup-submit" class="button primary" type="submit">${ui.setup.submit}</button>
@@ -356,6 +419,7 @@ function setupPageHtml(locale: Locale) {
         const emailInput = document.getElementById("email");
         const usernameInput = document.getElementById("username");
         const passwordInput = document.getElementById("password");
+        const confirmPasswordInput = document.getElementById("confirm-password");
 
         function setError(message) {
           if (!message) {
@@ -367,7 +431,7 @@ function setupPageHtml(locale: Locale) {
           errorNode.classList.remove("hidden");
         }
 
-        [emailInput, usernameInput, passwordInput].forEach((input) => {
+        [emailInput, usernameInput, passwordInput, confirmPasswordInput].forEach((input) => {
           input.addEventListener("input", () => {
             input.removeAttribute("aria-invalid");
             setError("");
@@ -381,6 +445,7 @@ function setupPageHtml(locale: Locale) {
           const email = emailInput.value.trim();
           const username = usernameInput.value.trim();
           const password = passwordInput.value;
+          const confirmPassword = confirmPasswordInput.value;
 
           if (!email || !username || !password) {
             if (!email) emailInput.setAttribute("aria-invalid", "true");
@@ -397,6 +462,13 @@ function setupPageHtml(locale: Locale) {
             return;
           }
 
+          if (password !== confirmPassword) {
+            confirmPasswordInput.setAttribute("aria-invalid", "true");
+            setError(__UI__.setup.passwordMismatch);
+            confirmPasswordInput.focus();
+            return;
+          }
+
           await window.withButtonLoading(submitBtn, __UI__.setup.submitting, async () => {
             try {
               const response = await fetch("/setup/initialize", {
@@ -408,15 +480,12 @@ function setupPageHtml(locale: Locale) {
                 const result = await response.json().catch(() => null);
                 const message = result?.error?.message ?? __UI__.setup.failed;
                 setError(message);
-                window.toast(message, "error");
                 return;
               }
               const result = await response.json().catch(() => null);
-              window.toast("✓", "ok", 900);
               location.href = result?.next_path || "/app";
             } catch (error) {
               setError(error.message || __UI__.setup.failed);
-              window.toast(error.message || __UI__.setup.failed, "error");
             }
           });
         });
@@ -451,8 +520,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           </div>
         </header>
         <div class="dashboard-grid">
-          <aside class="panel sidebar" role="navigation">
-            <button class="nav-button active" type="button" data-panel="overview">${ui.dashboard.overview}</button>
+          <aside class="panel sidebar" role="navigation" aria-label="Dashboard navigation">
+            <button class="nav-button active" type="button" data-panel="overview" aria-current="page">${ui.dashboard.overview}</button>
             <button class="nav-button" type="button" data-panel="mailboxes">${ui.dashboard.mailboxes}</button>
             <button class="nav-button" type="button" data-panel="tokens">${ui.dashboard.tokens}</button>
             <button class="nav-button" type="button" data-panel="domains">${ui.dashboard.domains}</button>
@@ -627,6 +696,13 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                     </div>
                   </div>
                   <div class="field">
+                    <label for="user-confirm-password">${ui.dashboard.confirmPassword}</label>
+                    <div class="password-wrap">
+                      <input id="user-confirm-password" class="input" name="confirm_password" type="password" minlength="8" required />
+                      <button type="button" class="password-toggle" data-password-toggle="user-confirm-password" aria-pressed="false">${ui.common.show}</button>
+                    </div>
+                  </div>
+                  <div class="field">
                     <label for="user-role">${ui.dashboard.role}</label>
                     <select id="user-role" class="select" name="role">
                       <option value="user">${ui.dashboard.statusLabels.user}</option>
@@ -650,7 +726,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   <div class="meta">${ui.dashboard.operationsSubtitle}</div>
                 </div>
               </div>
-              <div class="card-grid">
+              <div class="card-grid" style="margin-bottom:16px;">
                 <div class="metric">
                   <span class="meta">${ui.dashboard.cloudflareRuntime}</span>
                   <strong id="cf-runtime-state">-</strong>
@@ -672,30 +748,51 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   <strong id="ops-tokens">-</strong>
                 </div>
               </div>
-              <form id="cloudflare-config-form" class="field-grid" style="margin-top:16px;" novalidate>
-                <div class="field">
-                  <label for="cloudflare-api-token">
-                    <span>${ui.dashboard.cloudflareToken}</span>
-                    <span class="field-hint">${ui.dashboard.cloudflareTokenHint}</span>
-                  </label>
-                  <div class="password-wrap">
-                    <input id="cloudflare-api-token" class="input" name="api_token" type="password" autocomplete="off" />
-                    <button type="button" class="password-toggle" data-password-toggle="cloudflare-api-token" aria-pressed="false">${ui.common.show}</button>
+              <div class="ops-tabs" role="tablist">
+                <button class="ops-tab active" type="button" data-ops-tab="cloudflare" role="tab" aria-selected="true">${ui.dashboard.opsTabCloudflare}</button>
+                <button class="ops-tab" type="button" data-ops-tab="mailboxes" role="tab" aria-selected="false">${ui.dashboard.opsTabMailboxes}</button>
+                <button class="ops-tab" type="button" data-ops-tab="messages" role="tab" aria-selected="false">${ui.dashboard.opsTabMessages}</button>
+                <button class="ops-tab" type="button" data-ops-tab="tokens" role="tab" aria-selected="false">${ui.dashboard.opsTabTokens}</button>
+                <button class="ops-tab" type="button" data-ops-tab="audit" role="tab" aria-selected="false">${ui.dashboard.opsTabAudit}</button>
+              </div>
+              <div id="ops-tab-cloudflare" class="ops-tab-content active" role="tabpanel">
+                <form id="cloudflare-config-form" class="field-grid" novalidate>
+                  <div class="field">
+                    <label for="cloudflare-api-token">
+                      <span>${ui.dashboard.cloudflareToken}</span>
+                      <span class="field-hint">${ui.dashboard.cloudflareTokenHint}</span>
+                    </label>
+                    <div class="password-wrap">
+                      <input id="cloudflare-api-token" class="input" name="api_token" type="password" autocomplete="off" />
+                      <button type="button" class="password-toggle" data-password-toggle="cloudflare-api-token" aria-pressed="false">${ui.common.show}</button>
+                    </div>
                   </div>
-                </div>
-                <div id="cloudflare-feedback" class="notice hidden" role="status"></div>
-                <div class="button-row">
-                  <button id="cloudflare-save" class="button primary" type="submit">${ui.dashboard.saveToken}</button>
-                  <button id="cloudflare-clear" class="button danger" type="button">${ui.dashboard.clearToken}</button>
-                </div>
-              </form>
-              <div id="ops-status" class="notice" style="margin-top:16px;"></div>
-              <div id="admin-mailbox-list" class="table-wrap" style="margin-top:16px;"></div>
-              <div id="admin-message-list" class="table-wrap" style="margin-top:16px;"></div>
-              <div id="admin-token-list" class="table-wrap" style="margin-top:16px;"></div>
-              <div id="audit-list" class="table-wrap" style="margin-top:16px;"></div>
+                  <div id="cloudflare-feedback" class="notice hidden" role="status"></div>
+                  <div class="button-row">
+                    <button id="cloudflare-save" class="button primary" type="submit">${ui.dashboard.saveToken}</button>
+                    <button id="cloudflare-clear" class="button danger" type="button">${ui.dashboard.clearToken}</button>
+                  </div>
+                </form>
+                <div id="ops-status" class="notice" style="margin-top:16px;"></div>
+              </div>
+              <div id="ops-tab-mailboxes" class="ops-tab-content" role="tabpanel">
+                <div id="admin-mailbox-list" class="table-wrap"></div>
+              </div>
+              <div id="ops-tab-messages" class="ops-tab-content" role="tabpanel">
+                <div id="admin-message-list" class="table-wrap"></div>
+              </div>
+              <div id="ops-tab-tokens" class="ops-tab-content" role="tabpanel">
+                <div id="admin-token-list" class="table-wrap"></div>
+              </div>
+              <div id="ops-tab-audit" class="ops-tab-content" role="tabpanel">
+                <div id="audit-list" class="table-wrap"></div>
+              </div>
             </section>
           </main>
+        </div>
+        <div class="shortcut-bar">
+          <span style="font-weight:600;">⌨</span>
+          <span class="shortcut-item"><span class="kbd">r</span> ${ui.dashboard.shortcutRefresh}</span>
         </div>
       </div>
       <script>
@@ -707,6 +804,10 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         const DEFAULT_PAGE_SIZE = 20;
         const AUDIT_DEFAULT_PAGE_SIZE = 50;
         const FULL_PAGE_SIZE = 200;
+
+        // 按需加载：追踪已加载的面板
+        const loadedPanels = new Set(["overview"]);
+        let currentPanel = "overview";
 
         function createPagination(pageSize) {
           return { page: 1, pageSize: pageSize || DEFAULT_PAGE_SIZE, total: 0, totalPages: 1 };
@@ -821,8 +922,15 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         async function request(path, options = {}) {
           const response = await fetch(path, options);
           if (response.status === 401) {
-            window.toast(UI.common.sessionExpired, "error");
-            setTimeout(() => { location.href = "/login"; }, 800);
+            // 弹窗提示而非直接跳转，避免丢失未保存内容
+            const ok = await window.confirmModal({
+              title: UI.common.sessionExpired,
+              body: UI.common.sessionExpired,
+              confirmText: UI.common.confirm,
+              cancelText: UI.common.cancel,
+              tone: "danger",
+            });
+            if (ok) location.href = "/login";
             throw new Error(UI.common.sessionExpired);
           }
           const isJson = response.headers.get("content-type")?.includes("application/json");
@@ -924,6 +1032,17 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           '</span>';
         }
 
+        function timeCell(isoString) {
+          return window.formatTimeCell(isoString);
+        }
+
+        function expiresCell(isoString) {
+          if (!isoString) return "-";
+          const local = window.formatLocalTime(isoString);
+          const rel = window.formatRelativeTime(isoString);
+          return '<span class="time-relative"><span class="time-abs">' + escapeHtml(local) + '</span><span class="time-rel">' + escapeHtml(rel) + '</span></span>';
+        }
+
         function renderMailboxes() {
           selectors.mailboxList.innerHTML = renderTableWithPagination(
             "mailboxes",
@@ -931,7 +1050,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             state.mailboxes.map((item) => [
               copyableMono(item.email_address),
               formatTag(item.status),
-              escapeHtml(item.expires_at),
+              expiresCell(item.expires_at),
               item.encrypted_access_url
                 ? '<span class="copy-group"><a class="button sm ghost" href="' + escapeAttr(item.encrypted_access_url) + '" target="_blank" rel="noreferrer">' + escapeHtml(UI.common.open) + '</a>' +
                   '<button type="button" class="copy-btn" data-copy="' + escapeAttr(item.encrypted_access_url) + '">' + escapeHtml(UI.common.copy) + '</button></span>'
@@ -969,7 +1088,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               escapeHtml(item.name),
               '<span class="mono">' + escapeHtml(item.token_prefix) + '</span>',
               formatTag(item.status),
-              escapeHtml(item.last_used_at || "-"),
+              timeCell(item.last_used_at),
               item.status === "revoked"
                 ? '<span class="muted">' + escapeHtml(translateLabel("revoked")) + '</span>'
                 : '<button class="button sm danger" type="button" data-revoke-token="' + escapeAttr(item.id) + '" data-token-name="' + escapeAttr(item.name) + '">' + escapeHtml(UI.dashboard.revoke) + '</button>',
@@ -1044,7 +1163,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 escapeHtml(item.email) + (isSelf ? ' <span class="pill-chip">' + escapeHtml(UI.dashboard.youBadge) + '</span>' : ''),
                 formatTag(item.role),
                 formatTag(item.status),
-                escapeHtml(item.last_login_at || "-"),
+                timeCell(item.last_login_at),
                 '<div class="inline-actions">' + toggleBtn + deleteBtn + '</div>',
               ];
             }),
@@ -1062,7 +1181,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             state.mailboxMessages.map((item) => [
               escapeHtml(item.from_address || "-"),
               escapeHtml(item.subject || UI.common.untitled),
-              escapeHtml(item.received_at),
+              timeCell(item.received_at),
               escapeHtml(String(item.size ?? 0)),
               String(item.attachment_count || 0),
             ]),
@@ -1118,7 +1237,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               escapeHtml(item.user_email || "-"),
               escapeHtml(item.domain || "-"),
               formatTag(item.status),
-              escapeHtml(item.expires_at || "-"),
+              expiresCell(item.expires_at),
             ]),
           );
 
@@ -1129,7 +1248,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               copyableMono(item.to_address),
               escapeHtml(item.from_address || "-"),
               escapeHtml(item.subject || UI.common.untitled),
-              escapeHtml(item.received_at || "-"),
+              timeCell(item.received_at),
               escapeHtml(String(item.size ?? 0)),
               escapeHtml(item.owner_email || "-"),
             ]),
@@ -1143,8 +1262,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               escapeHtml(item.name),
               '<span class="mono">' + escapeHtml(item.token_prefix) + '</span>',
               formatTag(item.status),
-              escapeHtml(item.last_used_at || "-"),
-              escapeHtml(item.revoked_at || "-"),
+              timeCell(item.last_used_at),
+              timeCell(item.revoked_at),
               item.status === "revoked"
                 ? '<span class="muted">' + escapeHtml(translateLabel("revoked")) + '</span>'
                 : '<button class="button sm danger" type="button" data-admin-revoke-token="' + escapeAttr(item.id) + '" data-token-name="' + escapeAttr(item.name) + '">' + escapeHtml(UI.dashboard.revoke) + '</button>',
@@ -1155,7 +1274,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             "audits",
             [UI.dashboard.time, UI.dashboard.action, UI.dashboard.actor, UI.dashboard.target, UI.dashboard.metadata],
             state.audits.map((item) => [
-              escapeHtml(item.created_at),
+              timeCell(item.created_at),
               '<span class="pill-chip">' + escapeHtml(item.action) + '</span>',
               escapeHtml(item.actor_user_id || "-"),
               escapeHtml([item.target_type, item.target_id].filter(Boolean).join(": ") || "-"),
@@ -1337,6 +1456,68 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
         async function loadData(options = {}) {
           try {
+            // 按需加载：只加载当前面板需要的数据
+            await loadPanelData(currentPanel);
+
+            if (options.showToast) {
+              window.toast(UI.dashboard.dataLoaded, "ok", 1600);
+            }
+          } catch (error) {
+            window.toast(error.message || UI.common.requestFailed, "error");
+          }
+        }
+
+        async function loadPanelData(panel) {
+          switch (panel) {
+            case "overview":
+              await Promise.all([
+                reloadUserDomains(),
+                reloadTokens(),
+                reloadMailboxes(),
+                ...(CURRENT_USER.role === "admin" ? [
+                  reloadAdminUsers(),
+                  reloadAdminDomains(),
+                  reloadAdminMailboxes(),
+                  reloadAdminMessages(),
+                ] : []),
+              ]);
+              renderMetrics();
+              break;
+            case "mailboxes":
+              await Promise.all([reloadUserDomains(), reloadMailboxes()]);
+              break;
+            case "tokens":
+              await reloadTokens();
+              break;
+            case "domains":
+              if (CURRENT_USER.role === "admin") {
+                await Promise.all([reloadAdminDomains(), reloadAdminUsers()]);
+              } else {
+                await reloadUserDomains();
+              }
+              break;
+            case "users":
+              if (CURRENT_USER.role === "admin") await reloadAdminUsers();
+              break;
+            case "ops":
+              if (CURRENT_USER.role === "admin") {
+                await Promise.all([
+                  reloadAdminMailboxes(),
+                  reloadAdminMessages(),
+                  reloadAdminTokens(),
+                  reloadAudits(),
+                  request("/admin/cloudflare/status").then((payload) => {
+                    state.cloudflareStatus = payload;
+                  }).catch(() => {}),
+                ]);
+                renderOps();
+              }
+              break;
+          }
+        }
+
+        async function loadAllData(options = {}) {
+          try {
             await Promise.all([
               reloadUserDomains(),
               reloadTokens(),
@@ -1353,7 +1534,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 reloadAudits(),
                 request("/admin/cloudflare/status").then((payload) => {
                   state.cloudflareStatus = payload;
-                }),
+                }).catch(() => {}),
               ]);
             }
 
@@ -1374,20 +1555,30 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
         // --- Navigation ---
         document.querySelectorAll(".nav-button").forEach((button) => {
-          button.addEventListener("click", () => {
-            document.querySelectorAll(".nav-button").forEach((item) => item.classList.remove("active"));
+          button.addEventListener("click", async () => {
+            document.querySelectorAll(".nav-button").forEach((item) => {
+              item.classList.remove("active");
+              item.removeAttribute("aria-current");
+            });
             button.classList.add("active");
+            button.setAttribute("aria-current", "page");
             const panel = button.getAttribute("data-panel");
+            currentPanel = panel;
             document.querySelectorAll("main > section").forEach((section) => section.classList.add("hidden"));
             const target = document.getElementById("panel-" + panel);
             target.classList.remove("hidden");
             target.scrollIntoView({ behavior: "smooth", block: "start" });
+            // 按需加载：首次切换到面板时加载数据
+            if (!loadedPanels.has(panel)) {
+              loadedPanels.add(panel);
+              await loadPanelData(panel);
+            }
           });
         });
 
         // --- Refresh ---
         document.getElementById("refresh-all").addEventListener("click", (event) => {
-          window.withButtonLoading(event.currentTarget, UI.common.refreshing, () => loadData({ showToast: true }));
+          window.withButtonLoading(event.currentTarget, UI.common.refreshing, () => loadAllData({ showToast: true }));
         });
 
         // --- Logout ---
@@ -1653,17 +1844,19 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   ttl_seconds: ttlSeconds,
                 }),
               });
-              const msg = result.email_address + " / " + UI.dashboard.mailboxCreated;
-              showFeedback("mailbox-feedback", msg);
-              window.toast(msg, "ok");
+              window.toast(result.email_address + " " + UI.dashboard.mailboxCreated, "ok");
               forms.mailbox.reset();
               ttlPreset.value = "86400";
               ttlInput.classList.add("hidden");
               ttlInput.value = "86400";
               await loadData();
+              // 自动选中新创建的邮箱
+              if (result.id) {
+                selectors.mailboxPicker.value = result.id;
+                await loadMailboxMessages(result.id);
+              }
             } catch (error) {
               showFeedback("mailbox-feedback", error.message, "error");
-              window.toast(error.message, "error");
             }
           });
         });
@@ -1681,16 +1874,31 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: formData.get("name") }),
               });
-              selectors.tokenSecret.textContent = result.value;
-              selectors.tokenSecretCopy.setAttribute("data-copy", result.value);
-              selectors.tokenSecretWrap.classList.remove("hidden");
-              showFeedback("token-feedback", UI.dashboard.tokenCreated);
+              // 用模态弹窗强制展示 Token 明文，确保用户复制后才能关闭
+              const bodyNode = document.createElement("div");
+              bodyNode.innerHTML = '<p style="margin:0 0 10px;">' + escapeHtml(UI.dashboard.tokenSecretWarning) + '</p>' +
+                '<div class="mono" style="user-select:all; padding:10px; background:rgba(255,255,255,0.04); border-radius:6px; word-break:break-all;">' + escapeHtml(result.value) + '</div>';
+              const copyBtn = document.createElement("button");
+              copyBtn.className = "button sm ghost";
+              copyBtn.textContent = UI.common.copy;
+              copyBtn.style.marginTop = "10px";
+              copyBtn.addEventListener("click", async () => {
+                const ok = await window.copyToClipboard(result.value);
+                if (ok) { copyBtn.textContent = UI.common.copied; window.toast(UI.common.copied, "ok", 1200); }
+              });
+              bodyNode.appendChild(copyBtn);
+              await window.confirmModal({
+                title: UI.dashboard.tokenCreated,
+                body: bodyNode,
+                confirmText: UI.common.close,
+                cancelText: UI.common.copy,
+                tone: "default",
+              });
               window.toast(UI.dashboard.tokenCreated, "ok");
               forms.token.reset();
               await loadData();
             } catch (error) {
               showFeedback("token-feedback", error.message, "error");
-              window.toast(error.message, "error");
             }
           });
         });
@@ -1711,13 +1919,11 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   status: formData.get("status"),
                 }),
               });
-              showFeedback("domain-feedback", UI.dashboard.domainCreated);
               window.toast(UI.dashboard.domainCreated, "ok");
               forms.domain.reset();
               await loadData();
             } catch (error) {
               showFeedback("domain-feedback", error.message, "error");
-              window.toast(error.message, "error");
             }
           });
         });
@@ -1734,12 +1940,10 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ domain_id: formData.get("domain_id") }),
               });
-              showFeedback("assign-feedback", UI.dashboard.domainAssigned);
               window.toast(UI.dashboard.domainAssigned, "ok");
               await loadData();
             } catch (error) {
               showFeedback("assign-feedback", error.message, "error");
-              window.toast(error.message, "error");
             }
           });
         });
@@ -1749,6 +1953,12 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           clearFeedback("user-feedback");
           const submitBtn = document.getElementById("user-submit");
           const formData = new FormData(forms.user);
+          const password = formData.get("password");
+          const confirmPassword = formData.get("confirm_password");
+          if (password !== confirmPassword) {
+            showFeedback("user-feedback", UI.dashboard.passwordMismatch, "error");
+            return;
+          }
           await window.withButtonLoading(submitBtn, UI.dashboard.creating, async () => {
             try {
               await request("/admin/users", {
@@ -1757,17 +1967,15 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 body: JSON.stringify({
                   email: formData.get("email"),
                   username: formData.get("username"),
-                  password: formData.get("password"),
+                  password: password,
                   role: formData.get("role"),
                 }),
               });
-              showFeedback("user-feedback", UI.dashboard.userCreated);
               window.toast(UI.dashboard.userCreated, "ok");
               forms.user.reset();
               await loadData();
             } catch (error) {
               showFeedback("user-feedback", error.message, "error");
-              window.toast(error.message, "error");
             }
           });
         });
@@ -1828,8 +2036,24 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             const tag = document.activeElement?.tagName;
             if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
             event.preventDefault();
-            loadData({ showToast: true });
+            loadAllData({ showToast: true });
           }
+        });
+
+        // --- Ops sub-tabs ---
+        document.querySelectorAll(".ops-tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            document.querySelectorAll(".ops-tab").forEach((t) => {
+              t.classList.remove("active");
+              t.setAttribute("aria-selected", "false");
+            });
+            tab.classList.add("active");
+            tab.setAttribute("aria-selected", "true");
+            const target = tab.getAttribute("data-ops-tab");
+            document.querySelectorAll(".ops-tab-content").forEach((c) => c.classList.remove("active"));
+            const panel = document.getElementById("ops-tab-" + target);
+            if (panel) panel.classList.add("active");
+          });
         });
 
         loadData();
@@ -1901,7 +2125,7 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
               </div>
             </div>
             <div class="search-wrap">
-              <input id="message-search" class="input" type="search" placeholder="${ui.inbox.searchMessages}" autocomplete="off" />
+              <input id="message-search" class="input" type="search" placeholder="${ui.inbox.searchMessages} ${ui.inbox.searchCurrentPageOnly}" autocomplete="off" />
             </div>
             <div id="message-list" class="message-list" role="listbox" aria-label="${ui.inbox.messages}"></div>
             <div id="message-pagination"></div>
@@ -1918,6 +2142,11 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
             </div>
           </section>
         </div>
+        <div class="shortcut-bar">
+          <span style="font-weight:600;">${ui.dashboard.shortcutHint}:</span>
+          <span class="shortcut-item"><span class="kbd">j</span>/<span class="kbd">k</span> ${ui.dashboard.shortcutNav}</span>
+          <span class="shortcut-item"><span class="kbd">/</span> ${ui.dashboard.shortcutSearch}</span>
+        </div>
       </div>
       <script>
         ${clientRuntimeScript(ui)}
@@ -1928,7 +2157,9 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
         const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
         let currentMessageId = null;
         let allMessages = [];
+        let seenMessageIds = new Set();
         let searchQuery = "";
+        let lastInteractionTime = Date.now();
         const pagination = { page: 1, pageSize: 20, total: 0, totalPages: 1 };
         const banner = document.getElementById("inbox-banner");
         const countdown = document.getElementById("expires-countdown");
@@ -2032,9 +2263,11 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
 
           node.innerHTML = filtered.map((item) =>
             '<button class="message-item ' + (item.id === currentMessageId ? "active" : "") + '" data-message-id="' + escapeHtml(item.id) + '" role="option" aria-selected="' + (item.id === currentMessageId) + '">' +
-              '<div><strong>' + escapeHtml(item.subject || UI.common.untitled) + '</strong></div>' +
+              '<div><strong>' + escapeHtml(item.subject || UI.common.untitled) + '</strong>' +
+              (!seenMessageIds.has(item.id) ? '<span class="new-badge">' + UI.inbox.newBadge + '</span>' : '') +
+              '</div>' +
               '<div class="meta">' + escapeHtml(item.from_address || "-") + '</div>' +
-              '<div class="meta">' + escapeHtml(item.received_at) + ' · ' + escapeHtml(item.size || 0) + ' ' + UI.inbox.bytes + ' · ' + escapeHtml(item.attachment_count) + ' ' + UI.inbox.attachments + '</div>' +
+              '<div class="meta">' + window.formatLocalTime(item.received_at) + ' · ' + escapeHtml(item.size || 0) + ' ' + UI.inbox.bytes + ' · ' + escapeHtml(item.attachment_count) + ' ' + UI.inbox.attachments + '</div>' +
             '</button>'
           ).join("");
 
@@ -2080,7 +2313,7 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
             (result.message.from_address || "-") + " → " + result.message.to_address + " · " + result.message.received_at;
 
           const htmlBlock = result.message.html_body
-            ? '<div class="panel subpanel"><div class="meta" style="margin-bottom:10px;">' + escapeHtml(UI.inbox.htmlPreview) + '</div><iframe class="mail-html" sandbox srcdoc="' + String(result.message.html_body).replace(/"/g, "&quot;") + '"></iframe></div>'
+            ? '<div class="panel subpanel"><div class="meta" style="margin-bottom:10px;">' + escapeHtml(UI.inbox.htmlPreview) + '</div><iframe class="mail-html" id="mail-iframe" sandbox srcdoc="' + String(result.message.html_body).replace(/"/g, "&quot;") + '"></iframe></div>'
             : "";
           const textBlock = result.message.text_body
             ? '<div class="panel subpanel"><div class="meta" style="margin-bottom:10px;">' + escapeHtml(UI.inbox.textBody) + '</div><pre class="notice" style="white-space:pre-wrap; margin:0;">' + escapeHtml(result.message.text_body) + '</pre></div>'
@@ -2100,6 +2333,18 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
             textBlock +
             htmlBlock +
             attachments;
+
+          // iframe 自适应高度
+          const iframe = document.getElementById("mail-iframe");
+          if (iframe) {
+            iframe.addEventListener("load", () => {
+              try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const height = Math.max(280, doc.documentElement.scrollHeight + 20);
+                iframe.style.height = Math.min(height, 800) + "px";
+              } catch (e) { /* cross-origin, keep default */ }
+            });
+          }
         }
 
         async function loadMessages(options = {}) {
@@ -2109,7 +2354,12 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
           params.set("page_size", String(pagination.pageSize));
           const result = await request("/inbox/" + encodeURIComponent(INBOX_TOKEN) + "/messages?" + params.toString());
           const previousCount = allMessages.length;
+          const previousIds = new Set(allMessages.map((m) => m.id));
           allMessages = result.messages || [];
+          // 首次加载时标记所有消息为已读
+          if (previousCount === 0) {
+            allMessages.forEach((m) => seenMessageIds.add(m.id));
+          }
           if (result.pagination) {
             pagination.page = result.pagination.page ?? pagination.page;
             pagination.pageSize = result.pagination.page_size ?? pagination.pageSize;
@@ -2138,10 +2388,16 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
           const button = event.target.closest("[data-message-id]");
           if (!button) return;
           currentMessageId = button.getAttribute("data-message-id");
+          seenMessageIds.add(currentMessageId);
+          lastInteractionTime = Date.now();
           renderList();
           try {
             const detail = await request("/inbox/" + encodeURIComponent(INBOX_TOKEN) + "/messages/" + currentMessageId);
             renderMessage(detail);
+            // 移动端自动滚动到详情区域
+            if (window.innerWidth <= 980) {
+              document.getElementById("message-view")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
           } catch (error) {
             showInboxError(error.message);
           }
@@ -2223,9 +2479,17 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
           }
         });
 
-        setInterval(() => { loadMessages({ silent: false }).catch(() => {}); }, 30000);
+        setInterval(() => {
+          // 如果用户最近 15 秒内有交互，暂停自动刷新
+          if (Date.now() - lastInteractionTime < 15000) return;
+          loadMessages({ silent: false }).catch(() => {});
+        }, 30000);
         setInterval(updateExpiryBanner, 1000);
         updateExpiryBanner();
+
+        // 追踪用户交互
+        document.addEventListener("click", () => { lastInteractionTime = Date.now(); });
+        document.addEventListener("keydown", () => { lastInteractionTime = Date.now(); });
 
         loadMessages({ silent: true }).catch((error) => showInboxError(error.message));
       </script>
