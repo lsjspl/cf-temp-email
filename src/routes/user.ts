@@ -155,8 +155,8 @@ userApp.patch("/user/api-tokens/:id", async (c) => {
   }
   
   await c.env.DB.prepare(
-    "UPDATE api_tokens SET name = ?, updated_at = ? WHERE id = ?"
-  ).bind(name, new Date().toISOString(), tokenId).run();
+    "UPDATE api_tokens SET name = ? WHERE id = ?"
+  ).bind(name, tokenId).run();
   
   await writeAuditLog(c.env, {
     ...getAuditContext(c),

@@ -2035,7 +2035,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             });
             if (!ok) return;
             
-            const checkboxes = document.querySelectorAll("#modal-domain-checkboxes .domain-checkbox");
+            const checkboxes = bodyNode.querySelectorAll(".domain-checkbox");
             const selectedIds = new Set();
             checkboxes.forEach((cb) => { if (cb.checked) selectedIds.add(cb.value); });
             
