@@ -48,19 +48,37 @@ function resolveTtlSeconds(env: AppEnv, ttlSeconds?: number | null): number {
 }
 
 async function loadUserDomain(env: AppEnv, userId: string, domainId: string): Promise<DomainRow | null> {
-  return (
-    (await env.DB.prepare(
-      `
-        SELECT d.id, d.domain
-        FROM domains d
-        INNER JOIN user_domains ud ON ud.domain_id = d.id
-        WHERE ud.user_id = ? AND d.id = ? AND d.status = 'active'
-        LIMIT 1
-      `,
-    )
-      .bind(userId, domainId)
-      .first<DomainRow>()) ?? null
-  );
+  // 先查用户是否已分配该域名
+  const assigned = await env.DB.prepare(
+    `
+      SELECT d.id, d.domain
+      FROM domains d
+      INNER JOIN user_domains ud ON ud.domain_id = d.id
+      WHERE ud.user_id = ? AND d.id = ? AND d.status = 'active'
+      LIMIT 1
+    `,
+  )
+    .bind(userId, domainId)
+    .first<DomainRow>();
+
+  if (assigned) return assigned;
+
+  // 如果未分配，检查用户是否是 admin——admin 可以使用任何 active 域名
+  const user = await env.DB.prepare("SELECT role FROM users WHERE id = ? LIMIT 1")
+    .bind(userId)
+    .first<{ role: string }>();
+
+  if (user?.role === "admin") {
+    return (
+      (await env.DB.prepare(
+        "SELECT id, domain FROM domains WHERE id = ? AND status = 'active' LIMIT 1",
+      )
+        .bind(domainId)
+        .first<DomainRow>()) ?? null
+    );
+  }
+
+  return null;
 }
 
 async function emailExists(env: AppEnv, emailAddress: string): Promise<boolean> {

@@ -19,6 +19,11 @@ export function relativeTime(iso: string | null | undefined): string {
   return future ? `${d}天后` : `${d}天前`;
 }
 
+/** 格式化时间：绝对时间 + 相对时间 */
+export function formatTimeWithRelative(iso: string | null | undefined): { absolute: string; relative: string } {
+  return { absolute: formatTime(iso), relative: relativeTime(iso) };
+}
+
 export function statusTag(value: string | boolean | null | undefined): "good" | "warn" | "bad" | "default" {
   if (["active", "ok", "admin", "ready"].includes(String(value))) return "good";
   if (["pending"].includes(String(value))) return "warn";

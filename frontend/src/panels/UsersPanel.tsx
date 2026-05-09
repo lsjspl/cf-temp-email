@@ -10,7 +10,7 @@ import { useConfirm } from "../hooks/useConfirm";
 import { formatTime } from "../lib/utils";
 
 interface User { id: string; email: string; username: string | null; role: string; status: string; last_login_at: string | null }
-interface Domain { id: string; domain: string }
+interface Domain { id: string; domain: string; status?: string }
 
 export default function UsersPanel({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<User[]>([]);
@@ -36,7 +36,7 @@ export default function UsersPanel({ currentUserId }: { currentUserId: string })
   async function loadDomains() {
     try {
       const res = await apiGet<{ domains: Domain[] }>("/admin/domains?page=1&page_size=200");
-      setAllDomains(res.domains.filter((d: Domain & { status?: string }) => (d as { status?: string }).status === "active"));
+      setAllDomains(res.domains.filter((d) => d.status === "active"));
     } catch { /* ignore */ }
   }
 
