@@ -898,6 +898,39 @@ export function renderDocument(options: {
         flex-wrap: wrap;
       }
 
+      .toolbar-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      /* Custom select styling to match dark theme */
+      .select,
+      select.select,
+      .page-size-select,
+      .modal-card select {
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2397a4b5' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 32px;
+      }
+
+      .select option,
+      select option {
+        background: #1a1f28;
+        color: var(--text);
+        padding: 8px 12px;
+      }
+
+      .select:focus option:checked,
+      select:focus option:checked {
+        background: rgba(143, 247, 194, 0.2);
+        color: var(--accent);
+      }
+
       .pagination {
         display: flex;
         flex-wrap: wrap;

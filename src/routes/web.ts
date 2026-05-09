@@ -522,9 +522,9 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         <div class="dashboard-grid">
           <aside class="panel sidebar" role="navigation" aria-label="Dashboard navigation">
             <button class="nav-button active" type="button" data-panel="overview" aria-current="page">${ui.dashboard.overview}</button>
+            <button class="nav-button" type="button" data-panel="domains">${ui.dashboard.domains}</button>
             <button class="nav-button" type="button" data-panel="mailboxes">${ui.dashboard.mailboxes}</button>
             <button class="nav-button" type="button" data-panel="tokens">${ui.dashboard.tokens}</button>
-            <button class="nav-button" type="button" data-panel="domains">${ui.dashboard.domains}</button>
             <button class="nav-button ${user.role === "admin" ? "" : "hidden"}" type="button" data-panel="users">${ui.dashboard.users}</button>
             <button class="nav-button ${user.role === "admin" ? "" : "hidden"}" type="button" data-panel="ops">${ui.dashboard.ops}</button>
           </aside>
@@ -546,50 +546,14 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   <div class="meta">${ui.dashboard.mailboxesSubtitle}</div>
                 </div>
               </div>
-              <div class="split-grid">
-                <form id="mailbox-form" class="field-grid" novalidate>
-                  <div class="field">
-                    <label for="mailbox-domain">${ui.dashboard.domain}</label>
-                    <select id="mailbox-domain" class="select" name="domain_id" required></select>
-                  </div>
-                  <div class="field">
-                    <label for="mailbox-prefix">
-                      <span>${ui.dashboard.prefix}</span>
-                      <span class="field-hint">${ui.dashboard.prefixHint}</span>
-                    </label>
-                    <input id="mailbox-prefix" class="input" name="prefix" placeholder="${ui.dashboard.prefixPlaceholder}" pattern="[a-z0-9][a-z0-9\\-_]{1,62}" />
-                  </div>
-                  <div class="field">
-                    <label for="mailbox-ttl-preset">
-                      <span>${ui.dashboard.ttlSeconds}</span>
-                      <span class="field-hint">${ui.dashboard.ttlHint}</span>
-                    </label>
-                    <select id="mailbox-ttl-preset" class="select">
-                      <option value="3600">${ui.dashboard.ttlPreset1h}</option>
-                      <option value="21600">${ui.dashboard.ttlPreset6h}</option>
-                      <option value="86400" selected>${ui.dashboard.ttlPreset1d}</option>
-                      <option value="604800">${ui.dashboard.ttlPreset7d}</option>
-                      <option value="custom">${ui.dashboard.ttlCustom}</option>
-                    </select>
-                    <input id="mailbox-ttl" class="input hidden" name="ttl_seconds" type="number" min="60" value="86400" />
-                  </div>
-                  <div id="mailbox-feedback" class="notice hidden" role="status"></div>
-                  <div class="button-row">
-                    <button id="mailbox-submit" class="button primary" type="submit">${ui.dashboard.createMailbox}</button>
-                  </div>
-                </form>
-                <div class="panel subpanel">
-                  <div class="panel-header">
-                    <div>
-                      <h3>${ui.dashboard.messagePeek}</h3>
-                      <div class="meta">${ui.dashboard.messagePeekSubtitle}</div>
-                    </div>
-                  </div>
-                  <select id="mailbox-picker" class="select" aria-label="${ui.common.selectMailbox}"></select>
-                  <div id="mailbox-messages" class="table-wrap" style="margin-top:12px;"></div>
+              <div class="toolbar-row">
+                <div class="search-wrap" style="flex:1; margin-bottom:0;">
+                  <input id="mailbox-search" class="input" type="search" placeholder="${ui.common.search}..." autocomplete="off" />
                 </div>
+                <button id="mailbox-add-btn" class="button primary" type="button">${ui.dashboard.createMailbox}</button>
               </div>
-              <div id="mailbox-list" class="table-wrap" style="margin-top:16px;"></div>
+              <div id="mailbox-feedback" class="notice hidden" role="status" style="margin-top:12px;"></div>
+              <div id="mailbox-list" class="table-wrap" style="margin-top:12px;"></div>
             </section>
 
             <section id="panel-tokens" class="panel hidden">
@@ -599,26 +563,14 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   <div class="meta">${ui.dashboard.tokensSubtitle}</div>
                 </div>
               </div>
-              <div class="split-grid">
-                <form id="token-form" class="field-grid" novalidate>
-                  <div class="field">
-                    <label for="token-name">${ui.dashboard.name}</label>
-                    <input id="token-name" class="input" name="name" placeholder="${ui.dashboard.namePlaceholder}" required />
-                  </div>
-                  <div id="token-feedback" class="notice hidden" role="status"></div>
-                  <div class="button-row">
-                    <button id="token-submit" class="button primary" type="submit">${ui.dashboard.createToken}</button>
-                  </div>
-                </form>
-                <div id="token-secret-wrap" class="notice warn hidden" role="alert">
-                  <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center;">
-                    <strong>${ui.dashboard.tokenSecretWarning}</strong>
-                    <button type="button" class="button sm ghost" id="token-secret-copy" data-copy="">${ui.common.copy}</button>
-                  </div>
-                  <div id="token-secret" class="mono" style="margin-top:8px; user-select:all;"></div>
+              <div class="toolbar-row">
+                <div class="search-wrap" style="flex:1; margin-bottom:0;">
+                  <input id="token-search" class="input" type="search" placeholder="${ui.common.search}..." autocomplete="off" />
                 </div>
+                <button id="token-add-btn" class="button primary" type="button">${ui.dashboard.createToken}</button>
               </div>
-              <div id="token-list" class="table-wrap" style="margin-top:16px;"></div>
+              <div id="token-feedback" class="notice hidden" role="status" style="margin-top:12px;"></div>
+              <div id="token-list" class="table-wrap" style="margin-top:12px;"></div>
             </section>
 
             <section id="panel-domains" class="panel hidden">
@@ -628,47 +580,14 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   <div class="meta">${ui.dashboard.domainsSubtitle}</div>
                 </div>
               </div>
-              <div class="split-grid ${user.role === "admin" ? "" : "hidden"}">
-                <form id="domain-form" class="field-grid" novalidate>
-                  <div class="field">
-                    <label for="domain-name">${ui.dashboard.domain}</label>
-                    <input id="domain-name" class="input" name="domain" placeholder="${ui.dashboard.domainPlaceholder}" required />
-                  </div>
-                  <div class="field">
-                    <label for="domain-type">${ui.dashboard.type}</label>
-                    <select id="domain-type" class="select" name="type">
-                      <option value="subdomain">${ui.dashboard.statusLabels.subdomain}</option>
-                      <option value="root">${ui.dashboard.statusLabels.root}</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label for="domain-status">${ui.dashboard.status}</label>
-                    <select id="domain-status" class="select" name="status">
-                      <option value="pending">${ui.dashboard.statusLabels.pending}</option>
-                      <option value="active">${ui.dashboard.statusLabels.active}</option>
-                    </select>
-                  </div>
-                  <div id="domain-feedback" class="notice hidden" role="status"></div>
-                  <div class="button-row">
-                    <button id="domain-submit" class="button primary" type="submit">${ui.dashboard.addDomain}</button>
-                  </div>
-                </form>
-                <form id="assign-form" class="field-grid" novalidate>
-                  <div class="field">
-                    <label for="assign-user">${ui.dashboard.assignUser}</label>
-                    <select id="assign-user" class="select" name="user_id" required></select>
-                  </div>
-                  <div class="field">
-                    <label for="assign-domain">${ui.dashboard.assignDomain}</label>
-                    <select id="assign-domain" class="select" name="domain_id" required></select>
-                  </div>
-                  <div id="assign-feedback" class="notice hidden" role="status"></div>
-                  <div class="button-row">
-                    <button id="assign-submit" class="button primary" type="submit">${ui.dashboard.assignDomainAction}</button>
-                  </div>
-                </form>
+              <div class="toolbar-row ${user.role === "admin" ? "" : "hidden"}">
+                <div class="search-wrap" style="flex:1; margin-bottom:0;">
+                  <input id="domain-search" class="input" type="search" placeholder="${ui.common.search}..." autocomplete="off" />
+                </div>
+                <button id="domain-add-btn" class="button primary" type="button">${ui.dashboard.addDomain}</button>
               </div>
-              <div id="domain-list" class="table-wrap" style="margin-top:16px;"></div>
+              <div id="domain-feedback" class="notice hidden" role="status" style="margin-top:12px;"></div>
+              <div id="domain-list" class="table-wrap" style="margin-top:12px;"></div>
             </section>
 
             <section id="panel-users" class="panel hidden ${user.role === "admin" ? "" : "hidden"}">
@@ -678,45 +597,14 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                   <div class="meta">${ui.dashboard.usersSubtitle}</div>
                 </div>
               </div>
-              <div class="split-grid">
-                <form id="user-form" class="field-grid" novalidate>
-                  <div class="field">
-                    <label for="user-email">${ui.dashboard.email}</label>
-                    <input id="user-email" class="input" name="email" type="email" required />
-                  </div>
-                  <div class="field">
-                    <label for="user-username">${ui.dashboard.username}</label>
-                    <input id="user-username" class="input" name="username" required />
-                  </div>
-                  <div class="field">
-                    <label for="user-password">${ui.dashboard.password}</label>
-                    <div class="password-wrap">
-                      <input id="user-password" class="input" name="password" type="password" minlength="8" required />
-                      <button type="button" class="password-toggle" data-password-toggle="user-password" aria-pressed="false">${ui.common.show}</button>
-                    </div>
-                  </div>
-                  <div class="field">
-                    <label for="user-confirm-password">${ui.dashboard.confirmPassword}</label>
-                    <div class="password-wrap">
-                      <input id="user-confirm-password" class="input" name="confirm_password" type="password" minlength="8" required />
-                      <button type="button" class="password-toggle" data-password-toggle="user-confirm-password" aria-pressed="false">${ui.common.show}</button>
-                    </div>
-                  </div>
-                  <div class="field">
-                    <label for="user-role">${ui.dashboard.role}</label>
-                    <select id="user-role" class="select" name="role">
-                      <option value="user">${ui.dashboard.statusLabels.user}</option>
-                      <option value="admin">${ui.dashboard.statusLabels.admin}</option>
-                    </select>
-                  </div>
-                  <div id="user-feedback" class="notice hidden" role="status"></div>
-                  <div class="button-row">
-                    <button id="user-submit" class="button primary" type="submit">${ui.dashboard.createUser}</button>
-                  </div>
-                </form>
-                <div class="notice">${ui.dashboard.userActionsHint}</div>
+              <div class="toolbar-row">
+                <div class="search-wrap" style="flex:1; margin-bottom:0;">
+                  <input id="user-search" class="input" type="search" placeholder="${ui.common.search}..." autocomplete="off" />
+                </div>
+                <button id="user-add-btn" class="button primary" type="button">${ui.dashboard.createUser}</button>
               </div>
-              <div id="user-list" class="table-wrap" style="margin-top:16px;"></div>
+              <div id="user-feedback" class="notice hidden" role="status" style="margin-top:12px;"></div>
+              <div id="user-list" class="table-wrap" style="margin-top:12px;"></div>
             </section>
 
             <section id="panel-ops" class="panel hidden ${user.role === "admin" ? "" : "hidden"}">
@@ -847,12 +735,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         const selectors = {
           metrics: document.getElementById("metrics"),
           mailboxList: document.getElementById("mailbox-list"),
-          mailboxPicker: document.getElementById("mailbox-picker"),
-          mailboxMessages: document.getElementById("mailbox-messages"),
           tokenList: document.getElementById("token-list"),
-          tokenSecret: document.getElementById("token-secret"),
-          tokenSecretWrap: document.getElementById("token-secret-wrap"),
-          tokenSecretCopy: document.getElementById("token-secret-copy"),
           domainList: document.getElementById("domain-list"),
           userList: document.getElementById("user-list"),
           adminMailboxList: document.getElementById("admin-mailbox-list"),
@@ -863,11 +746,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         };
 
         const forms = {
-          mailbox: document.getElementById("mailbox-form"),
-          token: document.getElementById("token-form"),
-          domain: document.getElementById("domain-form"),
-          assign: document.getElementById("assign-form"),
-          user: document.getElementById("user-form"),
           cloudflareConfig: document.getElementById("cloudflare-config-form"),
         };
 
@@ -1016,7 +894,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 { label: UI.dashboard.metricMyDomains, value: state.pagination.userDomains.total || state.userDomains.length },
                 { label: UI.dashboard.metricMyTokens, value: state.pagination.tokens.total || state.tokens.length },
                 { label: UI.dashboard.metricMyMailboxes, value: state.pagination.mailboxes.total || state.mailboxes.length },
-                { label: UI.dashboard.metricMailboxMessages, value: state.pagination.mailboxMessages.total || state.mailboxMessages.length },
               ];
 
           selectors.metrics.innerHTML = cards.map((item) =>
@@ -1057,27 +934,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 : "-",
             ]),
           );
-
-          const mailboxDomain = document.getElementById("mailbox-domain");
-          const domainOptionsSource = state.userDomainsAll.length ? state.userDomainsAll : state.userDomains;
-          if (domainOptionsSource.length === 0) {
-            mailboxDomain.innerHTML = '<option value="">' + escapeHtml(UI.dashboard.noDomainsAvailable) + '</option>';
-            mailboxDomain.disabled = true;
-            document.getElementById("mailbox-submit").disabled = true;
-          } else {
-            mailboxDomain.innerHTML = domainOptionsSource.map((domain) =>
-              '<option value="' + escapeAttr(domain.id) + '">' + escapeHtml(domain.domain) + '</option>'
-            ).join("");
-            mailboxDomain.disabled = false;
-            document.getElementById("mailbox-submit").disabled = false;
-          }
-
-          const mailboxOptionsSource = state.mailboxesAll.length ? state.mailboxesAll : state.mailboxes;
-          selectors.mailboxPicker.innerHTML =
-            '<option value="">' + escapeHtml(UI.common.selectMailbox) + '</option>' +
-            mailboxOptionsSource.map((item) =>
-              '<option value="' + escapeAttr(item.id) + '">' + escapeHtml(item.email_address) + '</option>'
-            ).join("");
         }
 
         function renderTokenList() {
@@ -1117,36 +973,9 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 : "-",
             ]),
           );
-
-          const assignDomain = document.getElementById("assign-domain");
-          if (assignDomain) {
-            const adminDomainSource = state.allDomainsAll.length ? state.allDomainsAll : state.allDomains;
-            const activeDomains = adminDomainSource.filter((item) => item.status === "active");
-            if (activeDomains.length === 0) {
-              assignDomain.innerHTML = '<option value="">' + escapeHtml(UI.dashboard.noActiveDomains) + '</option>';
-              assignDomain.disabled = true;
-            } else {
-              assignDomain.innerHTML = activeDomains.map((item) => '<option value="' + escapeAttr(item.id) + '">' + escapeHtml(item.domain) + '</option>').join("");
-              assignDomain.disabled = false;
-            }
-          }
         }
 
         function renderUsers() {
-          const assignUser = document.getElementById("assign-user");
-          if (assignUser) {
-            const userSource = state.usersAll.length ? state.usersAll : state.users;
-            if (userSource.length === 0) {
-              assignUser.innerHTML = '<option value="">' + escapeHtml(UI.dashboard.noUsersAvailable) + '</option>';
-              assignUser.disabled = true;
-            } else {
-              assignUser.innerHTML = userSource
-                .map((item) => '<option value="' + escapeAttr(item.id) + '">' + escapeHtml(item.email) + '</option>')
-                .join("");
-              assignUser.disabled = false;
-            }
-          }
-
           selectors.userList.innerHTML = renderTableWithPagination(
             "users",
             [UI.dashboard.email, UI.dashboard.role, UI.dashboard.status, UI.dashboard.lastLogin, UI.dashboard.actions],
@@ -1159,32 +988,17 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               const toggleBtn = isSelf
                 ? ""
                 : '<button class="button sm" type="button" data-toggle-user="' + escapeAttr(item.id) + '" data-next-status="' + escapeAttr(item.status === "active" ? "disabled" : "active") + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(toggleLabel) + '</button>';
+              const assignBtn = CURRENT_USER.role === "admin"
+                ? '<button class="button sm" type="button" data-assign-domain-user="' + escapeAttr(item.id) + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(UI.dashboard.assignDomainAction) + '</button>'
+                : "";
               return [
                 escapeHtml(item.email) + (isSelf ? ' <span class="pill-chip">' + escapeHtml(UI.dashboard.youBadge) + '</span>' : ''),
                 formatTag(item.role),
                 formatTag(item.status),
                 timeCell(item.last_login_at),
-                '<div class="inline-actions">' + toggleBtn + deleteBtn + '</div>',
+                '<div class="inline-actions">' + assignBtn + toggleBtn + deleteBtn + '</div>',
               ];
             }),
-          );
-        }
-
-        function renderMailboxMessages() {
-          if ((state.mailboxesAll.length || state.mailboxes.length) === 0) {
-            selectors.mailboxMessages.innerHTML = '<div class="notice">' + escapeHtml(UI.dashboard.selectMailboxFirst) + '</div>';
-            return;
-          }
-          selectors.mailboxMessages.innerHTML = renderTableWithPagination(
-            "mailboxMessages",
-            [UI.dashboard.from, UI.dashboard.subject, UI.dashboard.received, UI.dashboard.size, UI.dashboard.attachments],
-            state.mailboxMessages.map((item) => [
-              escapeHtml(item.from_address || "-"),
-              escapeHtml(item.subject || UI.common.untitled),
-              timeCell(item.received_at),
-              escapeHtml(String(item.size ?? 0)),
-              String(item.attachment_count || 0),
-            ]),
           );
         }
 
@@ -1301,33 +1115,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           meta.totalPages = Math.max(1, payload.total_pages ?? 1);
         }
 
-        async function loadMailboxMessages(mailboxId, options = {}) {
-          if (!mailboxId) {
-            state.mailboxMessages = [];
-            state.mailboxMessagesMailboxId = "";
-            state.pagination.mailboxMessages.page = 1;
-            state.pagination.mailboxMessages.total = 0;
-            state.pagination.mailboxMessages.totalPages = 1;
-            renderMailboxMessages();
-            return;
-          }
-          if (state.mailboxMessagesMailboxId !== mailboxId && !options.keepPage) {
-            state.pagination.mailboxMessages.page = 1;
-          }
-          state.mailboxMessagesMailboxId = mailboxId;
-          try {
-            const result = await request(
-              "/user/mailboxes/" + mailboxId + "/messages" + buildQuery("mailboxMessages"),
-            );
-            state.mailboxMessages = result.messages;
-            applyPaginationMeta("mailboxMessages", result.pagination);
-          } catch (error) {
-            state.mailboxMessages = [];
-          }
-          renderMailboxMessages();
-          renderMetrics();
-        }
-
         async function reloadUserDomains() {
           const result = await request("/user/domains" + buildQuery("userDomains"));
           state.userDomains = result.domains;
@@ -1366,16 +1153,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           }
           renderMailboxes();
           renderMetrics();
-          const picker = selectors.mailboxPicker;
-          const preferred = picker.value || state.mailboxesAll[0]?.id || state.mailboxes[0]?.id || "";
-          if (preferred && preferred !== state.mailboxMessagesMailboxId) {
-            picker.value = preferred;
-            await loadMailboxMessages(preferred);
-          } else if (!preferred) {
-            await loadMailboxMessages("");
-          } else {
-            renderMailboxMessages();
-          }
         }
 
         async function reloadAdminUsers() {
@@ -1442,11 +1219,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           allDomains: reloadAdminDomains,
           tokens: reloadTokens,
           mailboxes: reloadMailboxes,
-          mailboxMessages: async () => {
-            if (state.mailboxMessagesMailboxId) {
-              await loadMailboxMessages(state.mailboxMessagesMailboxId, { keepPage: true });
-            }
-          },
           users: reloadAdminUsers,
           adminMailboxes: reloadAdminMailboxes,
           adminMessages: reloadAdminMessages,
@@ -1597,23 +1369,72 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           location.href = "/login";
         });
 
-        // --- TTL preset toggle ---
-        const ttlPreset = document.getElementById("mailbox-ttl-preset");
-        const ttlInput = document.getElementById("mailbox-ttl");
-        ttlPreset.addEventListener("change", () => {
-          if (ttlPreset.value === "custom") {
-            ttlInput.classList.remove("hidden");
-            ttlInput.focus();
-            ttlInput.select();
+        // --- TTL preset toggle (used in mailbox modal) ---
+        function handleTtlPresetChange(presetEl, inputEl) {
+          if (presetEl.value === "custom") {
+            inputEl.classList.remove("hidden");
+            inputEl.focus();
           } else {
-            ttlInput.classList.add("hidden");
-            ttlInput.value = ttlPreset.value;
+            inputEl.classList.add("hidden");
+            inputEl.value = presetEl.value;
+          }
+        }
+
+        // --- Mailbox add button (modal) ---
+        document.getElementById("mailbox-add-btn")?.addEventListener("click", async () => {
+          const domainOptionsSource = state.userDomainsAll.length ? state.userDomainsAll : state.userDomains;
+          if (domainOptionsSource.length === 0) {
+            window.toast(UI.dashboard.noDomainsAvailable, "warn");
+            return;
+          }
+          const domainOptions = domainOptionsSource.map((d) =>
+            '<option value="' + escapeAttr(d.id) + '">' + escapeHtml(d.domain) + '</option>'
+          ).join("");
+          const bodyNode = document.createElement("div");
+          bodyNode.innerHTML =
+            '<div class="field-grid">' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.domain) + '</label><select class="select" id="modal-mailbox-domain">' + domainOptions + '</select></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.prefix) + ' <span class="field-hint">' + escapeHtml(UI.dashboard.prefixHint) + '</span></label><input class="input" id="modal-mailbox-prefix" placeholder="' + escapeAttr(UI.dashboard.prefixPlaceholder) + '" /></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.ttlSeconds) + '</label><select class="select" id="modal-mailbox-ttl-preset"><option value="3600">' + escapeHtml(UI.dashboard.ttlPreset1h) + '</option><option value="21600">' + escapeHtml(UI.dashboard.ttlPreset6h) + '</option><option value="86400" selected>' + escapeHtml(UI.dashboard.ttlPreset1d) + '</option><option value="604800">' + escapeHtml(UI.dashboard.ttlPreset7d) + '</option><option value="custom">' + escapeHtml(UI.dashboard.ttlCustom) + '</option></select><input class="input hidden" id="modal-mailbox-ttl" type="number" min="60" value="86400" /></div>' +
+            '</div>';
+          // TTL toggle inside modal
+          setTimeout(() => {
+            const preset = document.getElementById("modal-mailbox-ttl-preset");
+            const ttlInput = document.getElementById("modal-mailbox-ttl");
+            if (preset && ttlInput) preset.addEventListener("change", () => handleTtlPresetChange(preset, ttlInput));
+          }, 50);
+          const ok = await window.confirmModal({
+            title: UI.dashboard.createMailbox,
+            body: bodyNode,
+            confirmText: UI.dashboard.createMailbox,
+            cancelText: UI.common.cancel,
+          });
+          if (!ok) return;
+          const domainId = document.getElementById("modal-mailbox-domain")?.value;
+          const prefix = document.getElementById("modal-mailbox-prefix")?.value?.trim();
+          const presetVal = document.getElementById("modal-mailbox-ttl-preset")?.value;
+          const ttlSeconds = presetVal === "custom" ? Number(document.getElementById("modal-mailbox-ttl")?.value || 86400) : Number(presetVal);
+          try {
+            const result = await request("/user/mailboxes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ domain_id: domainId, prefix: prefix || undefined, ttl_seconds: ttlSeconds }),
+            });
+            window.toast(result.email_address + " " + UI.dashboard.mailboxCreated, "ok");
+            await loadData();
+          } catch (error) {
+            showFeedback("mailbox-feedback", error.message, "error");
           }
         });
 
-        // --- Mailbox picker ---
-        selectors.mailboxPicker.addEventListener("change", (event) => {
-          loadMailboxMessages(event.target.value);
+        // --- Mailbox search ---
+        document.getElementById("mailbox-search")?.addEventListener("input", (event) => {
+          const q = event.target.value.trim().toLowerCase();
+          const rows = selectors.mailboxList?.querySelectorAll("tbody tr") || [];
+          rows.forEach((row) => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = q && !text.includes(q) ? "none" : "";
+          });
         });
 
         // --- Pagination controls ---
@@ -1775,7 +1596,201 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         });
 
         // --- User actions (enable/disable/delete) ---
+        // (user toggle/delete/assign are handled in the combined userList click handler above)
+
+        // --- Token add button (modal) ---
+        document.getElementById("token-add-btn")?.addEventListener("click", async () => {
+          const bodyNode = document.createElement("div");
+          bodyNode.innerHTML =
+            '<div class="field-grid">' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.name) + '</label><input class="input" id="modal-token-name" placeholder="' + escapeAttr(UI.dashboard.namePlaceholder) + '" /></div>' +
+            '</div>';
+          const ok = await window.confirmModal({
+            title: UI.dashboard.createToken,
+            body: bodyNode,
+            confirmText: UI.dashboard.createToken,
+            cancelText: UI.common.cancel,
+          });
+          if (!ok) return;
+          const name = document.getElementById("modal-token-name")?.value?.trim();
+          if (!name) { window.toast(UI.common.requestFailed, "error"); return; }
+          try {
+            const result = await request("/user/api-tokens", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name }),
+            });
+            // 用模态弹窗强制展示 Token 明文
+            const secretNode = document.createElement("div");
+            secretNode.innerHTML = '<p style="margin:0 0 10px;">' + escapeHtml(UI.dashboard.tokenSecretWarning) + '</p>' +
+              '<div class="mono" style="user-select:all; padding:10px; background:rgba(255,255,255,0.04); border-radius:6px; word-break:break-all;">' + escapeHtml(result.value) + '</div>';
+            const copyBtn = document.createElement("button");
+            copyBtn.className = "button sm ghost";
+            copyBtn.textContent = UI.common.copy;
+            copyBtn.style.marginTop = "10px";
+            copyBtn.addEventListener("click", async () => {
+              const copied = await window.copyToClipboard(result.value);
+              if (copied) { copyBtn.textContent = UI.common.copied; window.toast(UI.common.copied, "ok", 1200); }
+            });
+            secretNode.appendChild(copyBtn);
+            await window.confirmModal({
+              title: UI.dashboard.tokenCreated,
+              body: secretNode,
+              confirmText: UI.common.close,
+              cancelText: UI.common.copy,
+            });
+            window.toast(UI.dashboard.tokenCreated, "ok");
+            await loadData();
+          } catch (error) {
+            showFeedback("token-feedback", error.message, "error");
+          }
+        });
+
+        // --- Token search ---
+        document.getElementById("token-search")?.addEventListener("input", (event) => {
+          const q = event.target.value.trim().toLowerCase();
+          const rows = selectors.tokenList?.querySelectorAll("tbody tr") || [];
+          rows.forEach((row) => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = q && !text.includes(q) ? "none" : "";
+          });
+        });
+
+        // --- Domain add button (modal) ---
+        document.getElementById("domain-add-btn")?.addEventListener("click", async () => {
+          const bodyNode = document.createElement("div");
+          bodyNode.innerHTML =
+            '<div class="field-grid">' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.domain) + '</label><input class="input" id="modal-domain-name" placeholder="' + escapeAttr(UI.dashboard.domainPlaceholder) + '" /></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.type) + '</label><select class="select" id="modal-domain-type"><option value="subdomain">' + escapeHtml(UI.dashboard.statusLabels.subdomain) + '</option><option value="root">' + escapeHtml(UI.dashboard.statusLabels.root) + '</option></select></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.status) + '</label><select class="select" id="modal-domain-status"><option value="pending">' + escapeHtml(UI.dashboard.statusLabels.pending) + '</option><option value="active">' + escapeHtml(UI.dashboard.statusLabels.active) + '</option></select></div>' +
+            '</div>';
+          const ok = await window.confirmModal({
+            title: UI.dashboard.addDomain,
+            body: bodyNode,
+            confirmText: UI.dashboard.addDomain,
+            cancelText: UI.common.cancel,
+          });
+          if (!ok) return;
+          const domain = document.getElementById("modal-domain-name")?.value?.trim();
+          const type = document.getElementById("modal-domain-type")?.value;
+          const status = document.getElementById("modal-domain-status")?.value;
+          if (!domain) { window.toast(UI.common.requestFailed, "error"); return; }
+          try {
+            await request("/admin/domains", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ domain, type, status }),
+            });
+            window.toast(UI.dashboard.domainCreated, "ok");
+            await loadData();
+          } catch (error) {
+            showFeedback("domain-feedback", error.message, "error");
+          }
+        });
+
+        // --- Domain search ---
+        document.getElementById("domain-search")?.addEventListener("input", (event) => {
+          const q = event.target.value.trim().toLowerCase();
+          const rows = selectors.domainList?.querySelectorAll("tbody tr") || [];
+          rows.forEach((row) => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = q && !text.includes(q) ? "none" : "";
+          });
+        });
+
+        // --- User add button (modal) ---
+        document.getElementById("user-add-btn")?.addEventListener("click", async () => {
+          const bodyNode = document.createElement("div");
+          bodyNode.innerHTML =
+            '<div class="field-grid">' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.email) + '</label><input class="input" id="modal-user-email" type="email" /></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.username) + '</label><input class="input" id="modal-user-username" /></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.password) + '</label><input class="input" id="modal-user-password" type="password" minlength="8" /></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.confirmPassword) + '</label><input class="input" id="modal-user-confirm-password" type="password" minlength="8" /></div>' +
+              '<div class="field"><label>' + escapeHtml(UI.dashboard.role) + '</label><select class="select" id="modal-user-role"><option value="user">' + escapeHtml(UI.dashboard.statusLabels.user) + '</option><option value="admin">' + escapeHtml(UI.dashboard.statusLabels.admin) + '</option></select></div>' +
+            '</div>';
+          const ok = await window.confirmModal({
+            title: UI.dashboard.createUser,
+            body: bodyNode,
+            confirmText: UI.dashboard.createUser,
+            cancelText: UI.common.cancel,
+          });
+          if (!ok) return;
+          const email = document.getElementById("modal-user-email")?.value?.trim();
+          const username = document.getElementById("modal-user-username")?.value?.trim();
+          const password = document.getElementById("modal-user-password")?.value;
+          const confirmPassword = document.getElementById("modal-user-confirm-password")?.value;
+          const role = document.getElementById("modal-user-role")?.value;
+          if (!email || !username || !password) { window.toast(UI.common.requestFailed, "error"); return; }
+          if (password !== confirmPassword) { window.toast(UI.dashboard.passwordMismatch, "error"); return; }
+          try {
+            await request("/admin/users", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, username, password, role }),
+            });
+            window.toast(UI.dashboard.userCreated, "ok");
+            await loadData();
+          } catch (error) {
+            showFeedback("user-feedback", error.message, "error");
+          }
+        });
+
+        // --- User search ---
+        document.getElementById("user-search")?.addEventListener("input", (event) => {
+          const q = event.target.value.trim().toLowerCase();
+          const rows = selectors.userList?.querySelectorAll("tbody tr") || [];
+          rows.forEach((row) => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = q && !text.includes(q) ? "none" : "";
+          });
+        });
+
+        // --- Assign domain to user (from user list) ---
         selectors.userList.addEventListener("click", async (event) => {
+          const assignBtn = event.target.closest("[data-assign-domain-user]");
+          if (assignBtn) {
+            const userId = assignBtn.getAttribute("data-assign-domain-user");
+            const userEmail = assignBtn.getAttribute("data-user-email") || "";
+            const adminDomainSource = state.allDomainsAll.length ? state.allDomainsAll : state.allDomains;
+            const activeDomains = adminDomainSource.filter((d) => d.status === "active");
+            if (activeDomains.length === 0) {
+              window.toast(UI.dashboard.noActiveDomains, "warn");
+              return;
+            }
+            const domainOptions = activeDomains.map((d) =>
+              '<option value="' + escapeAttr(d.id) + '">' + escapeHtml(d.domain) + '</option>'
+            ).join("");
+            const bodyNode = document.createElement("div");
+            bodyNode.innerHTML =
+              '<div class="field-grid">' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.assignUser) + '</label><div class="mono">' + escapeHtml(userEmail) + '</div></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.assignDomain) + '</label><select class="select" id="modal-assign-domain">' + domainOptions + '</select></div>' +
+              '</div>';
+            const ok = await window.confirmModal({
+              title: UI.dashboard.assignDomainAction,
+              body: bodyNode,
+              confirmText: UI.dashboard.assignDomainAction,
+              cancelText: UI.common.cancel,
+            });
+            if (!ok) return;
+            const domainId = document.getElementById("modal-assign-domain")?.value;
+            if (!domainId) return;
+            try {
+              await request("/admin/users/" + userId + "/domains", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ domain_id: domainId }),
+              });
+              window.toast(UI.dashboard.domainAssigned, "ok");
+              await loadData();
+            } catch (error) {
+              window.toast(error.message, "error");
+            }
+            return;
+          }
+
           const toggle = event.target.closest("[data-toggle-user]");
           if (toggle) {
             const nextStatus = toggle.getAttribute("data-next-status");
@@ -1824,160 +1839,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               }
             });
           }
-        });
-
-        // --- Forms ---
-        forms.mailbox?.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          clearFeedback("mailbox-feedback");
-          const submitBtn = document.getElementById("mailbox-submit");
-          const formData = new FormData(forms.mailbox);
-          const ttlSeconds = ttlPreset.value === "custom" ? Number(formData.get("ttl_seconds") || 86400) : Number(ttlPreset.value);
-          await window.withButtonLoading(submitBtn, UI.dashboard.creating, async () => {
-            try {
-              const result = await request("/user/mailboxes", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  domain_id: formData.get("domain_id"),
-                  prefix: formData.get("prefix"),
-                  ttl_seconds: ttlSeconds,
-                }),
-              });
-              window.toast(result.email_address + " " + UI.dashboard.mailboxCreated, "ok");
-              forms.mailbox.reset();
-              ttlPreset.value = "86400";
-              ttlInput.classList.add("hidden");
-              ttlInput.value = "86400";
-              await loadData();
-              // 自动选中新创建的邮箱
-              if (result.id) {
-                selectors.mailboxPicker.value = result.id;
-                await loadMailboxMessages(result.id);
-              }
-            } catch (error) {
-              showFeedback("mailbox-feedback", error.message, "error");
-            }
-          });
-        });
-
-        forms.token?.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          clearFeedback("token-feedback");
-          selectors.tokenSecretWrap.classList.add("hidden");
-          const submitBtn = document.getElementById("token-submit");
-          const formData = new FormData(forms.token);
-          await window.withButtonLoading(submitBtn, UI.dashboard.creating, async () => {
-            try {
-              const result = await request("/user/api-tokens", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: formData.get("name") }),
-              });
-              // 用模态弹窗强制展示 Token 明文，确保用户复制后才能关闭
-              const bodyNode = document.createElement("div");
-              bodyNode.innerHTML = '<p style="margin:0 0 10px;">' + escapeHtml(UI.dashboard.tokenSecretWarning) + '</p>' +
-                '<div class="mono" style="user-select:all; padding:10px; background:rgba(255,255,255,0.04); border-radius:6px; word-break:break-all;">' + escapeHtml(result.value) + '</div>';
-              const copyBtn = document.createElement("button");
-              copyBtn.className = "button sm ghost";
-              copyBtn.textContent = UI.common.copy;
-              copyBtn.style.marginTop = "10px";
-              copyBtn.addEventListener("click", async () => {
-                const ok = await window.copyToClipboard(result.value);
-                if (ok) { copyBtn.textContent = UI.common.copied; window.toast(UI.common.copied, "ok", 1200); }
-              });
-              bodyNode.appendChild(copyBtn);
-              await window.confirmModal({
-                title: UI.dashboard.tokenCreated,
-                body: bodyNode,
-                confirmText: UI.common.close,
-                cancelText: UI.common.copy,
-                tone: "default",
-              });
-              window.toast(UI.dashboard.tokenCreated, "ok");
-              forms.token.reset();
-              await loadData();
-            } catch (error) {
-              showFeedback("token-feedback", error.message, "error");
-            }
-          });
-        });
-
-        forms.domain?.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          clearFeedback("domain-feedback");
-          const submitBtn = document.getElementById("domain-submit");
-          const formData = new FormData(forms.domain);
-          await window.withButtonLoading(submitBtn, UI.dashboard.creating, async () => {
-            try {
-              await request("/admin/domains", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  domain: formData.get("domain"),
-                  type: formData.get("type"),
-                  status: formData.get("status"),
-                }),
-              });
-              window.toast(UI.dashboard.domainCreated, "ok");
-              forms.domain.reset();
-              await loadData();
-            } catch (error) {
-              showFeedback("domain-feedback", error.message, "error");
-            }
-          });
-        });
-
-        forms.assign?.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          clearFeedback("assign-feedback");
-          const submitBtn = document.getElementById("assign-submit");
-          const formData = new FormData(forms.assign);
-          await window.withButtonLoading(submitBtn, UI.dashboard.creating, async () => {
-            try {
-              await request("/admin/users/" + formData.get("user_id") + "/domains", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain_id: formData.get("domain_id") }),
-              });
-              window.toast(UI.dashboard.domainAssigned, "ok");
-              await loadData();
-            } catch (error) {
-              showFeedback("assign-feedback", error.message, "error");
-            }
-          });
-        });
-
-        forms.user?.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          clearFeedback("user-feedback");
-          const submitBtn = document.getElementById("user-submit");
-          const formData = new FormData(forms.user);
-          const password = formData.get("password");
-          const confirmPassword = formData.get("confirm_password");
-          if (password !== confirmPassword) {
-            showFeedback("user-feedback", UI.dashboard.passwordMismatch, "error");
-            return;
-          }
-          await window.withButtonLoading(submitBtn, UI.dashboard.creating, async () => {
-            try {
-              await request("/admin/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  email: formData.get("email"),
-                  username: formData.get("username"),
-                  password: password,
-                  role: formData.get("role"),
-                }),
-              });
-              window.toast(UI.dashboard.userCreated, "ok");
-              forms.user.reset();
-              await loadData();
-            } catch (error) {
-              showFeedback("user-feedback", error.message, "error");
-            }
-          });
         });
 
         forms.cloudflareConfig?.addEventListener("submit", async (event) => {
