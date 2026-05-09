@@ -38,13 +38,20 @@
   }
   .input option,
   select option {
-    background: #1a1f28;
-    color: #edf1f7;
+    background: #1a1f28 !important;
+    color: #edf1f7 !important;
+    padding: 8px 12px;
   }
   select:focus option:checked,
-  .input:focus option:checked {
-    background: rgba(143, 247, 194, 0.2);
-    color: #8ff7c2;
+  .input:focus option:checked,
+  select option:checked,
+  option:checked,
+  option:hover {
+    background: #253330 !important;
+    background-color: #253330 !important;
+    box-shadow: 0 0 10px 100px #253330 inset !important;
+    color: #8ff7c2 !important;
+    -webkit-text-fill-color: #8ff7c2 !important;
   }
   .card {
     @apply bg-panel border border-line rounded-lg shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl;
