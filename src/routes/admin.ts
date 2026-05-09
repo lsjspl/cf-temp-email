@@ -283,12 +283,12 @@ adminApp.delete("/admin/domains/:id", async (c) => {
   
   // 获取域名信息用于清理 Cloudflare
   const domainRecord = await c.env.DB.prepare(
-    "SELECT domain, zone_id, cloudflare_dns_record_id, cloudflare_rule_id FROM domains WHERE id = ?"
-  ).bind(domainId).first<{ domain: string; zone_id: string | null; cloudflare_dns_record_id: string | null; cloudflare_rule_id: string | null }>();
+    "SELECT domain, type, zone_id, cloudflare_dns_record_id, cloudflare_rule_id FROM domains WHERE id = ?"
+  ).bind(domainId).first<{ domain: string; type: string; zone_id: string | null; cloudflare_dns_record_id: string | null; cloudflare_rule_id: string | null }>();
   
-  // 清理 Cloudflare 上的 DNS 记录和 Email Routing 规则
+  // 只有子域名才清理 Cloudflare（根域名不动，避免误删根域名的 DNS 配置）
   let cfCleanup = { success: true, errors: [] as string[] };
-  if (domainRecord) {
+  if (domainRecord && domainRecord.type === "subdomain") {
     cfCleanup = await cleanupDomainFromCloudflare(c.env, domainRecord);
   }
   
