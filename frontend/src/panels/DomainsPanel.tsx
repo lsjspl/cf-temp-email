@@ -5,6 +5,7 @@ import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
 import Dropdown, { DropdownItem } from "../components/Dropdown";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../hooks/useConfirm";
 
 interface Domain { id: string; domain: string; type: string; status: string; assigned_user_count?: number }
 interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
@@ -16,6 +17,7 @@ export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<Domain | null>(null);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const load = useCallback(async (page = pagination.page, pageSize = pagination.pageSize) => {
     try {
@@ -45,7 +47,8 @@ export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("确认删除该域名？")) return;
+    const ok = await confirm({ title: "删除域名", message: "确认删除该域名？此操作不可撤销。", confirmText: "删除", danger: true });
+    if (!ok) return;
     await apiDelete(`/admin/domains/${id}`);
     toast("域名已删除", "ok");
     load();
@@ -64,7 +67,7 @@ export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
         <h2 className="text-lg font-semibold">域名</h2>
         <div className="flex items-center gap-2">
           <input className="input !py-2 !text-sm max-w-[200px]" placeholder="搜索..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          {isAdmin && <button className="btn-primary text-sm" onClick={() => setAddOpen(true)}>添加域名</button>}
+          {isAdmin && <button className="btn-primary text-sm whitespace-nowrap" onClick={() => setAddOpen(true)}>添加域名</button>}
         </div>
       </div>
       <Table
@@ -93,12 +96,12 @@ export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
 
 function AddDomainModal({ open, onClose, onSubmit }: { open: boolean; onClose: () => void; onSubmit: (domain: string, type: string) => void }) {
   const [domain, setDomain] = useState("");
-  const [type, setType] = useState("subdomain");
+  const [type, setType] = useState("root");
   return (
     <Modal open={open} title="添加域名" onClose={onClose} onConfirm={() => { if (domain) onSubmit(domain, type); }} confirmText="添加">
       <div className="space-y-3">
-        <div><label className="text-xs text-muted block mb-1">域名</label><input className="input" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="mail.example.com" /></div>
-        <div><label className="text-xs text-muted block mb-1">类型</label><select className="input" value={type} onChange={(e) => setType(e.target.value)}><option value="subdomain">子域名</option><option value="root">根域名</option></select></div>
+        <div><label className="text-xs text-muted block mb-1">域名</label><input className="input" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" /></div>
+        <div><label className="text-xs text-muted block mb-1">类型</label><select className="input" value={type} onChange={(e) => setType(e.target.value)}><option value="root">根域名</option><option value="subdomain">子域名</option></select></div>
       </div>
     </Modal>
   );

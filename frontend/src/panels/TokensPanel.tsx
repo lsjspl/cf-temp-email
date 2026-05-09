@@ -5,6 +5,7 @@ import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
 import Dropdown, { DropdownItem } from "../components/Dropdown";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../hooks/useConfirm";
 import { formatTime, copyText } from "../lib/utils";
 
 interface Token { id: string; name: string; token_prefix: string; status: string; last_used_at: string | null }
@@ -18,6 +19,7 @@ export default function TokensPanel() {
   const [newTokenValue, setNewTokenValue] = useState("");
   const [editItem, setEditItem] = useState<Token | null>(null);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
@@ -39,7 +41,8 @@ export default function TokensPanel() {
   }
 
   async function handleRevoke(id: string) {
-    if (!confirm("确认撤销该 Token？撤销后无法恢复。")) return;
+    const ok = await confirm({ title: "撤销 Token", message: "确认撤销该 Token？撤销后客户端将立即失去访问权限，无法恢复。", confirmText: "撤销", danger: true });
+    if (!ok) return;
     await apiDelete(`/user/api-tokens/${id}`);
     toast("Token 已撤销", "ok");
     load();
@@ -58,7 +61,7 @@ export default function TokensPanel() {
         <h2 className="text-lg font-semibold">API Token</h2>
         <div className="flex items-center gap-2">
           <input className="input !py-2 !text-sm max-w-[200px]" placeholder="搜索..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button className="btn-primary text-sm" onClick={() => setAddOpen(true)}>创建 Token</button>
+          <button className="btn-primary text-sm whitespace-nowrap" onClick={() => setAddOpen(true)}>创建 Token</button>
         </div>
       </div>
       <Table

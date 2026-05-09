@@ -5,6 +5,7 @@ import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
 import Dropdown, { DropdownItem } from "../components/Dropdown";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../hooks/useConfirm";
 import { formatTime, copyText } from "../lib/utils";
 
 interface Mailbox { id: string; email_address: string; status: string; expires_at: string; encrypted_access_url?: string }
@@ -18,6 +19,7 @@ export default function MailboxesPanel() {
   const [addOpen, setAddOpen] = useState(false);
   const [domains, setDomains] = useState<Domain[]>([]);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
@@ -46,7 +48,8 @@ export default function MailboxesPanel() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("确认删除该邮箱？")) return;
+    const ok = await confirm({ title: "删除邮箱", message: "确认删除该邮箱及其所有邮件？", confirmText: "删除", danger: true });
+    if (!ok) return;
     await apiDelete(`/user/mailboxes/${id}`);
     toast("邮箱已删除", "ok");
     load();
@@ -58,7 +61,7 @@ export default function MailboxesPanel() {
         <h2 className="text-lg font-semibold">邮箱</h2>
         <div className="flex items-center gap-2">
           <input className="input !py-2 !text-sm max-w-[200px]" placeholder="搜索..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button className="btn-primary text-sm" onClick={() => setAddOpen(true)}>创建邮箱</button>
+          <button className="btn-primary text-sm whitespace-nowrap" onClick={() => setAddOpen(true)}>创建邮箱</button>
         </div>
       </div>
       <Table

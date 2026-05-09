@@ -34,27 +34,27 @@ export default function DashboardPage({ user, onLogout }: { user: AuthUser; onLo
     <div className="max-w-7xl mx-auto p-6">
       <header className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="w-8 h-8 rounded" />
+          <h1 className="text-2xl font-semibold flex items-center gap-2.5">
+            <img src="/logo.png" alt="" className="w-9 h-9 rounded" />
             {ui.dashboard.title}
           </h1>
-          <p className="text-muted text-sm mt-1">
+          <p className="text-muted text-sm mt-1.5">
             <span className={`tag ${user.role === "admin" ? "tag-good" : "tag-default"}`}>
               {user.role === "admin" ? ui.dashboard.admin : ui.dashboard.user}
             </span>
-            <span className="ml-2 font-mono text-xs">{user.email}</span>
+            <span className="ml-2 font-mono">{user.email}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
           <select
-            className="input !w-auto !py-1.5 !px-2 !text-xs !min-h-0"
+            className="input !w-auto !py-2 !px-3 !text-sm !min-h-0"
             value={locale}
             onChange={(e) => switchLocale(e.target.value as Locale)}
           >
             <option value="zh-CN">中文</option>
             <option value="en">English</option>
           </select>
-          <button className="btn-danger text-xs !px-3 !py-1.5" onClick={onLogout}>
+          <button className="btn-danger text-sm" onClick={onLogout}>
             {ui.common.logout}
           </button>
         </div>

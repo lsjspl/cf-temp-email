@@ -3,18 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-size: 16px;
+  }
   body {
     background:
       radial-gradient(circle at top left, rgba(73, 214, 151, 0.14), transparent 30%),
       radial-gradient(circle at top right, rgba(87, 127, 255, 0.12), transparent 26%),
       linear-gradient(180deg, #091016 0%, #0b0d10 100%);
     font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
     @apply btn bg-gradient-to-br from-accent-strong to-accent text-gray-900 font-semibold hover:brightness-110 hover:shadow-[0_0_12px_rgba(143,247,194,0.3)];
@@ -29,7 +34,7 @@
     @apply btn bg-white/[0.06] text-white hover:bg-white/[0.14];
   }
   .input {
-    @apply w-full bg-white/[0.03] border border-line-strong rounded-md text-white px-3.5 py-3 outline-none transition-all duration-150 hover:border-white/20 focus:border-accent/70 focus:shadow-[0_0_0_3px_rgba(143,247,194,0.12)] placeholder:text-muted/60;
+    @apply w-full bg-white/[0.03] border border-line-strong rounded-md text-white px-3.5 py-3 outline-none transition-all duration-150 text-sm hover:border-white/20 focus:border-accent/70 focus:shadow-[0_0_0_3px_rgba(143,247,194,0.12)] placeholder:text-muted/60;
   }
   .card {
     @apply bg-panel border border-line rounded-lg shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-xl;

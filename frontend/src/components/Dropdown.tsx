@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   trigger?: ReactNode;
@@ -7,31 +8,50 @@ interface Props {
 
 export default function Dropdown({ trigger, children }: Props) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (btnRef.current?.contains(e.target as Node)) return;
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
     }
-    document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.right - 160),
+    });
   }, [open]);
 
   return (
-    <div className="relative inline-block" ref={ref}>
+    <>
       <button
-        className="btn-ghost !px-2.5 !py-1.5 !text-xs !min-h-0"
+        ref={btnRef}
+        className="btn-ghost !px-3 !py-2 !text-sm !min-h-0"
         onClick={() => setOpen(!open)}
       >
         {trigger ?? "操作 ▾"}
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 min-w-[140px] bg-panel-strong border border-line-strong rounded-md shadow-lg z-50 overflow-hidden">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed min-w-[140px] bg-panel-strong border border-line-strong rounded-md shadow-lg z-[9999] overflow-hidden"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <div onClick={() => setOpen(false)}>{children}</div>
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 

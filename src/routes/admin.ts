@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createUser, deleteUserById, listAllApiTokens, requireAuthUser, revokeApiToken, updateUser } from "../lib/auth";
 import { getAuditContext, writeAuditLog } from "../lib/audit";
 import { setStoredCloudflareApiToken } from "../lib/cloudflare";
+import { cleanupDomainFromCloudflare } from "../lib/cloudflare";
 import {
   assignDomainToUser,
   configureDomainRuntime,
@@ -280,7 +281,20 @@ adminApp.delete("/admin/domains/:id", async (c) => {
     throw new AppRouteError(400, "VALIDATION_ERROR", "Cannot delete domain with active mailboxes.");
   }
   
+  // 获取域名信息用于清理 Cloudflare
+  const domainRecord = await c.env.DB.prepare(
+    "SELECT domain, zone_id, cloudflare_dns_record_id, cloudflare_rule_id FROM domains WHERE id = ?"
+  ).bind(domainId).first<{ domain: string; zone_id: string | null; cloudflare_dns_record_id: string | null; cloudflare_rule_id: string | null }>();
+  
+  // 清理 Cloudflare 上的 DNS 记录和 Email Routing 规则
+  let cfCleanup = { success: true, errors: [] as string[] };
+  if (domainRecord) {
+    cfCleanup = await cleanupDomainFromCloudflare(c.env, domainRecord);
+  }
+  
+  // 删除数据库记录
   await c.env.DB.prepare("DELETE FROM user_domains WHERE domain_id = ?").bind(domainId).run();
+  await c.env.DB.prepare("DELETE FROM cloudflare_integrations WHERE domain_id = ?").bind(domainId).run();
   await c.env.DB.prepare("DELETE FROM domains WHERE id = ?").bind(domainId).run();
   
   await writeAuditLog(c.env, {
@@ -289,9 +303,13 @@ adminApp.delete("/admin/domains/:id", async (c) => {
     action: "admin.domain.deleted",
     targetType: "domain",
     targetId: domainId,
+    metadata: {
+      domain: domainRecord?.domain ?? null,
+      cloudflare_cleanup: cfCleanup,
+    },
   });
   
-  return c.json({ success: true });
+  return c.json({ success: true, cloudflare_cleanup: cfCleanup });
 });
 
 adminApp.post("/admin/domains/:id/verify", async (c) => {

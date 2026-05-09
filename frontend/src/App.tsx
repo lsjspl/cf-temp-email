@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import { ToastProvider } from "./components/Toast";
+import { ConfirmProvider } from "./hooks/useConfirm";
 import LoginPage from "./pages/LoginPage";
 import SetupPage from "./pages/SetupPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -19,6 +20,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <ConfirmProvider>
       <Routes>
         <Route
           path="/login"
@@ -35,6 +37,7 @@ export default function App() {
         <Route path="/inbox/:token" element={<InboxPage />} />
         <Route path="*" element={<Navigate to={requiresSetup ? "/setup" : user ? "/app" : "/login"} replace />} />
       </Routes>
+      </ConfirmProvider>
     </ToastProvider>
   );
 }

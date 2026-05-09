@@ -5,6 +5,7 @@ import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
 import Dropdown, { DropdownItem } from "../components/Dropdown";
 import { useToast } from "../components/Toast";
+import { useConfirm } from "../hooks/useConfirm";
 import { formatTime } from "../lib/utils";
 
 interface User { id: string; email: string; username: string | null; role: string; status: string; last_login_at: string | null }
@@ -20,6 +21,7 @@ export default function UsersPanel({ currentUserId }: { currentUserId: string })
   const [assignUser, setAssignUser] = useState<User | null>(null);
   const [allDomains, setAllDomains] = useState<Domain[]>([]);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
@@ -55,7 +57,8 @@ export default function UsersPanel({ currentUserId }: { currentUserId: string })
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("确认删除该用户？")) return;
+    const ok = await confirm({ title: "删除用户", message: "确认删除该用户？将永久删除其所有邮箱和 Token。", confirmText: "删除", danger: true });
+    if (!ok) return;
     await apiDelete(`/admin/users/${id}`);
     toast("用户已删除", "ok");
     load();
@@ -73,7 +76,7 @@ export default function UsersPanel({ currentUserId }: { currentUserId: string })
         <h2 className="text-lg font-semibold">用户</h2>
         <div className="flex items-center gap-2">
           <input className="input !py-2 !text-sm max-w-[200px]" placeholder="搜索..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <button className="btn-primary text-sm" onClick={() => setAddOpen(true)}>创建用户</button>
+          <button className="btn-primary text-sm whitespace-nowrap" onClick={() => setAddOpen(true)}>创建用户</button>
         </div>
       </div>
       <Table
