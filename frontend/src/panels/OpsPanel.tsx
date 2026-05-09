@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost } from "../lib/api"
+import { Pagination, RawPagination, mapPagination } from "../lib/pagination";
 import Table from "../components/Table";
 import StatusTag from "../components/StatusTag";
 import { useToast } from "../components/Toast";
 import { formatTime } from "../lib/utils";
 
-interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
 
 export default function OpsPanel() {
   const [tab, setTab] = useState<"cloudflare" | "mailboxes" | "messages" | "tokens" | "audit">("cloudflare");
@@ -71,9 +71,9 @@ function AdminMailboxesTab({ toast }: { toast: import("../components/Toast").Toa
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
-      const res = await apiGet<{ mailboxes: Record<string, unknown>[]; pagination: Pagination }>(`/admin/mailboxes?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ mailboxes: Record<string, unknown>[]; pagination: RawPagination }>(`/admin/mailboxes?page=${page}&page_size=${pageSize}`);
       setData(res.mailboxes);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 
@@ -101,9 +101,9 @@ function AdminMessagesTab({ toast }: { toast: import("../components/Toast").Toas
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
-      const res = await apiGet<{ messages: Record<string, unknown>[]; pagination: Pagination }>(`/admin/messages?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ messages: Record<string, unknown>[]; pagination: RawPagination }>(`/admin/messages?page=${page}&page_size=${pageSize}`);
       setData(res.messages);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 
@@ -131,9 +131,9 @@ function AdminTokensTab({ toast }: { toast: import("../components/Toast").ToastF
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
-      const res = await apiGet<{ tokens: Record<string, unknown>[]; pagination: Pagination }>(`/admin/api-tokens?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ tokens: Record<string, unknown>[]; pagination: RawPagination }>(`/admin/api-tokens?page=${page}&page_size=${pageSize}`);
       setData(res.tokens);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 
@@ -161,9 +161,9 @@ function AuditTab({ toast }: { toast: import("../components/Toast").ToastFn }) {
 
   const load = useCallback(async (page = 1, pageSize = 10) => {
     try {
-      const res = await apiGet<{ audit_logs: Record<string, unknown>[]; pagination: Pagination }>(`/admin/audit-logs?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ audit_logs: Record<string, unknown>[]; pagination: RawPagination }>(`/admin/audit-logs?page=${page}&page_size=${pageSize}`);
       setData(res.audit_logs);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 

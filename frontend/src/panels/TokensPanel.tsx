@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api"
+import { Pagination, RawPagination, mapPagination } from "../lib/pagination";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
@@ -9,7 +10,6 @@ import { useConfirm } from "../hooks/useConfirm";
 import { formatTime, copyText } from "../lib/utils";
 
 interface Token { id: string; name: string; token_prefix: string; status: string; last_used_at: string | null }
-interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
 
 export default function TokensPanel() {
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -23,9 +23,9 @@ export default function TokensPanel() {
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
-      const res = await apiGet<{ tokens: Token[]; pagination: Pagination }>(`/user/api-tokens?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ tokens: Token[]; pagination: RawPagination }>(`/user/api-tokens?page=${page}&page_size=${pageSize}`);
       setTokens(res.tokens);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 

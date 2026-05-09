@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api"
+import { Pagination, RawPagination, mapPagination } from "../lib/pagination";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
@@ -10,7 +11,6 @@ import { formatTime } from "../lib/utils";
 
 interface User { id: string; email: string; username: string | null; role: string; status: string; last_login_at: string | null }
 interface Domain { id: string; domain: string }
-interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
 
 export default function UsersPanel({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<User[]>([]);
@@ -25,9 +25,9 @@ export default function UsersPanel({ currentUserId }: { currentUserId: string })
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
-      const res = await apiGet<{ users: User[]; pagination: Pagination }>(`/admin/users?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ users: User[]; pagination: RawPagination }>(`/admin/users?page=${page}&page_size=${pageSize}`);
       setUsers(res.users);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 

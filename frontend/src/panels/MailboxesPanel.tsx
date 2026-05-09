@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPost } from "../lib/api";
+import { apiDelete, apiGet, apiPost } from "../lib/api"
+import { Pagination, RawPagination, mapPagination } from "../lib/pagination";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
@@ -10,7 +11,6 @@ import { formatTime, copyText } from "../lib/utils";
 
 interface Mailbox { id: string; email_address: string; status: string; expires_at: string; encrypted_access_url?: string }
 interface Domain { id: string; domain: string }
-interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
 
 export default function MailboxesPanel() {
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
@@ -23,9 +23,9 @@ export default function MailboxesPanel() {
 
   const load = useCallback(async (page = 1, pageSize = 20) => {
     try {
-      const res = await apiGet<{ mailboxes: Mailbox[]; pagination: Pagination }>(`/user/mailboxes?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ mailboxes: Mailbox[]; pagination: RawPagination }>(`/user/mailboxes?page=${page}&page_size=${pageSize}`);
       setMailboxes(res.mailboxes);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [toast]);
 

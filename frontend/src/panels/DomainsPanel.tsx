@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "../lib/api"
+import { Pagination, RawPagination, mapPagination } from "../lib/pagination";
 import Table from "../components/Table";
 import Modal from "../components/Modal";
 import StatusTag from "../components/StatusTag";
@@ -8,7 +9,6 @@ import { useToast } from "../components/Toast";
 import { useConfirm } from "../hooks/useConfirm";
 
 interface Domain { id: string; domain: string; type: string; status: string; assigned_user_count?: number }
-interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
 
 export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -22,9 +22,9 @@ export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
   const load = useCallback(async (page = pagination.page, pageSize = pagination.pageSize) => {
     try {
       const path = isAdmin ? "/admin/domains" : "/user/domains";
-      const res = await apiGet<{ domains: Domain[]; pagination: Pagination }>(`${path}?page=${page}&page_size=${pageSize}`);
+      const res = await apiGet<{ domains: Domain[]; pagination: RawPagination }>(`${path}?page=${page}&page_size=${pageSize}`);
       setDomains(res.domains);
-      setPagination(res.pagination);
+      setPagination(mapPagination(res.pagination));
     } catch (e) { toast(e instanceof Error ? e.message : "加载失败", "error"); }
   }, [isAdmin, pagination.page, pagination.pageSize, toast]);
 
