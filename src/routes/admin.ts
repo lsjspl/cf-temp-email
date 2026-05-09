@@ -219,6 +219,81 @@ adminApp.post("/admin/domains", async (c) => {
   );
 });
 
+adminApp.patch("/admin/domains/:id", async (c) => {
+  const actor = requireAuthUser(c);
+  const domainId = c.req.param("id");
+  const payload = await readJsonBody<Record<string, unknown>>(c);
+  
+  const type = payload.type ? String(payload.type) : undefined;
+  const status = payload.status ? String(payload.status) : undefined;
+  
+  const updates: string[] = [];
+  const bindings: unknown[] = [];
+  
+  if (type) {
+    updates.push("type = ?");
+    bindings.push(type);
+  }
+  if (status) {
+    updates.push("status = ?");
+    bindings.push(status);
+  }
+  
+  if (updates.length === 0) {
+    throw new AppRouteError(400, "VALIDATION_ERROR", "No valid fields to update.");
+  }
+  
+  updates.push("updated_at = ?");
+  bindings.push(new Date().toISOString());
+  bindings.push(domainId);
+  
+  await c.env.DB.prepare(
+    `UPDATE domains SET ${updates.join(", ")} WHERE id = ?`
+  ).bind(...bindings).run();
+  
+  const domain = await c.env.DB.prepare("SELECT * FROM domains WHERE id = ?")
+    .bind(domainId)
+    .first<Record<string, unknown>>();
+  
+  await writeAuditLog(c.env, {
+    ...getAuditContext(c),
+    actorUserId: actor.id,
+    action: "admin.domain.updated",
+    targetType: "domain",
+    targetId: domainId,
+    metadata: domain ?? null,
+  });
+  
+  return c.json({ domain });
+});
+
+adminApp.delete("/admin/domains/:id", async (c) => {
+  const actor = requireAuthUser(c);
+  const domainId = c.req.param("id");
+  
+  // 检查是否有邮箱使用该域名
+  const mailboxCount = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM mailboxes WHERE domain_id = ?"
+  ).bind(domainId).first<{ total: number | string }>();
+  
+  if (Number(mailboxCount?.total ?? 0) > 0) {
+    throw new AppRouteError(400, "VALIDATION_ERROR", "Cannot delete domain with active mailboxes.");
+  }
+  
+  await c.env.DB.prepare("DELETE FROM user_domains WHERE domain_id = ?").bind(domainId).run();
+  await c.env.DB.prepare("DELETE FROM domains WHERE id = ?").bind(domainId).run();
+  
+  await writeAuditLog(c.env, {
+    ...getAuditContext(c),
+    actorUserId: actor.id,
+    action: "admin.domain.deleted",
+    targetType: "domain",
+    targetId: domainId,
+  });
+  
+  return c.json({ success: true });
+});
+
 adminApp.post("/admin/domains/:id/verify", async (c) => {
   const actor = requireAuthUser(c);
   const domain = await markDomainVerified(c.env, c.req.param("id"));

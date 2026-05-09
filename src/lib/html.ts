@@ -238,7 +238,8 @@ export function renderDocument(options: {
       }
 
       .button:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.14);
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.06);
       }
 
       .button:active:not(:disabled) {
@@ -258,7 +259,8 @@ export function renderDocument(options: {
       }
 
       .button.primary:hover:not(:disabled) {
-        filter: brightness(1.08);
+        filter: brightness(1.15);
+        box-shadow: 0 0 12px rgba(143, 247, 194, 0.3);
       }
 
       .button.danger {
@@ -267,7 +269,8 @@ export function renderDocument(options: {
       }
 
       .button.danger:hover:not(:disabled) {
-        background: rgba(255, 125, 125, 0.26);
+        background: rgba(255, 125, 125, 0.28);
+        box-shadow: 0 0 8px rgba(255, 125, 125, 0.15);
       }
 
       .button.ghost {
@@ -276,7 +279,8 @@ export function renderDocument(options: {
       }
 
       .button.ghost:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.22);
       }
 
       .button.sm {
@@ -929,6 +933,73 @@ export function renderDocument(options: {
       select:focus option:checked {
         background: rgba(143, 247, 194, 0.2);
         color: var(--accent);
+      }
+
+      /* Dropdown menu for actions */
+      .dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .dropdown-toggle {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 6px 10px;
+        color: var(--text);
+        cursor: pointer;
+        font-size: 12px;
+        transition: background 140ms ease, border-color 140ms ease;
+      }
+
+      .dropdown-toggle:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .dropdown-menu {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 4px);
+        min-width: 140px;
+        background: var(--panel-strong);
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        box-shadow: var(--shadow);
+        z-index: 1000;
+        display: none;
+        overflow: hidden;
+      }
+
+      .dropdown.open .dropdown-menu {
+        display: block;
+      }
+
+      .dropdown-item {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        background: transparent;
+        border: 0;
+        color: var(--text);
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 140ms ease;
+        display: block;
+      }
+
+      .dropdown-item:hover {
+        background: rgba(143, 247, 194, 0.12);
+        color: var(--accent);
+      }
+
+      .dropdown-item.danger {
+        color: #ffd5d5;
+      }
+
+      .dropdown-item.danger:hover {
+        background: rgba(255, 125, 125, 0.16);
+        color: var(--danger);
       }
 
       .pagination {

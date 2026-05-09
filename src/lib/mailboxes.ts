@@ -150,11 +150,11 @@ export async function createMailbox(
     Date.now() + resolveTtlSeconds(env, ttlSeconds) * 1000,
   ).toISOString();
   const accessSecretHash = await sha256Hex(generateId("access"));
+  // 精简 payload：移除冗余 nonce（AES-GCM 的 IV 已保证唯一性），缩短 token 长度
   const encryptedToken = await encryptJsonToken(
     {
-      mailboxId,
-      expiresAt,
-      nonce: generateId("nonce"),
+      m: mailboxId,
+      e: expiresAt,
     },
     await getLinkSecret(env),
   );

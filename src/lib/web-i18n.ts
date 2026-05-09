@@ -11,8 +11,10 @@ function withLanguage(path: string, locale: Locale): string {
 export function languageSwitcher(currentPath: string, locale: Locale): string {
   return `
     <div class="button-row" style="justify-content:flex-end; margin-bottom:12px;">
-      <a class="button sm ${locale === "zh-CN" ? "primary" : "ghost"}" href="${withLanguage(currentPath, "zh-CN")}">中文</a>
-      <a class="button sm ${locale === "en" ? "primary" : "ghost"}" href="${withLanguage(currentPath, "en")}">English</a>
+      <select class="select sm" style="width:auto; padding:6px 32px 6px 10px; min-height:30px; font-size:12px;" onchange="location.href=this.value">
+        <option value="${withLanguage(currentPath, "zh-CN")}" ${locale === "zh-CN" ? "selected" : ""}>中文</option>
+        <option value="${withLanguage(currentPath, "en")}" ${locale === "en" ? "selected" : ""}>English</option>
+      </select>
     </div>
   `;
 }
@@ -187,6 +189,22 @@ const UI = {
       delete: "Delete",
       disable: "Disable",
       enable: "Enable",
+      edit: "Edit",
+      editDomain: "Edit domain",
+      editMailbox: "Edit mailbox",
+      editToken: "Edit token",
+      editUser: "Edit user",
+      confirmDeleteDomainTitle: "Delete domain?",
+      confirmDeleteDomainBody: "This will permanently remove the domain. Mailboxes using this domain will be affected.",
+      confirmDeleteMailboxTitle: "Delete mailbox?",
+      confirmDeleteMailboxBody: "This will permanently remove the mailbox and all its messages.",
+      confirmDeleteTokenTitle: "Delete token?",
+      confirmDeleteTokenBody: "This will permanently remove the token. This cannot be undone.",
+      domainUpdated: "Domain updated",
+      domainDeleted: "Domain deleted",
+      mailboxUpdated: "Mailbox updated",
+      mailboxDeleted: "Mailbox deleted",
+      tokenDeleted: "Token deleted",
       mailboxCreated: "Mailbox created",
       tokenCreated: "Token created",
       domainCreated: "Domain created",
@@ -455,6 +473,22 @@ const UI = {
       delete: "删除",
       disable: "禁用",
       enable: "启用",
+      edit: "编辑",
+      editDomain: "编辑域名",
+      editMailbox: "编辑邮箱",
+      editToken: "编辑 Token",
+      editUser: "编辑用户",
+      confirmDeleteDomainTitle: "确认删除该域名？",
+      confirmDeleteDomainBody: "将永久删除该域名，使用该域名的邮箱将受到影响。",
+      confirmDeleteMailboxTitle: "确认删除该邮箱？",
+      confirmDeleteMailboxBody: "将永久删除该邮箱及其所有邮件。",
+      confirmDeleteTokenTitle: "确认删除该 Token？",
+      confirmDeleteTokenBody: "将永久删除该 Token，操作无法撤销。",
+      domainUpdated: "域名已更新",
+      domainDeleted: "域名已删除",
+      mailboxUpdated: "邮箱已更新",
+      mailboxDeleted: "邮箱已删除",
+      tokenDeleted: "Token 已删除",
       mailboxCreated: "邮箱已创建",
       tokenCreated: "Token 已创建",
       domainCreated: "域名已创建",

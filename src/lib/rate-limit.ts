@@ -101,7 +101,8 @@ export function inboxRateLimit(): MiddlewareHandler<AppSchema> {
       const raw = path.startsWith(prefix) ? path.slice(prefix.length).split("/")[0] : "";
       const token = decodeURIComponent(raw);
       const ip = c.get("requestIp") ?? "unknown";
-      return token ? `${ip}:${token}` : null;
+      // 只用 token 前 24 字符作为 key，避免 KV key 过长
+      return token ? `${ip}:${token.slice(0, 24)}` : null;
     },
     auditAction: "inbox.rate_limited",
   });

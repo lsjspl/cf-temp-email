@@ -37,7 +37,7 @@ export async function validateInboxAccessToken(
       await writeAuditLog(env, {
         action: "inbox.access.rejected",
         targetType: "mailbox_access_link",
-        targetId: encryptedToken,
+        targetId: encryptedToken.slice(0, 32),
         ip: auditContext.ip ?? null,
         userAgent: auditContext.userAgent ?? null,
         metadata: {
@@ -50,13 +50,18 @@ export async function validateInboxAccessToken(
 
   let payload: InboxTokenPayload;
   try {
-    payload = await decryptJsonToken<InboxTokenPayload>(encryptedToken, await getLinkSecret(env));
+    const raw = await decryptJsonToken<Record<string, string>>(encryptedToken, await getLinkSecret(env));
+    // 兼容新旧格式：新格式用 m/e 短键，旧格式用 mailboxId/expiresAt
+    payload = {
+      mailboxId: raw.m ?? raw.mailboxId ?? "",
+      expiresAt: raw.e ?? raw.expiresAt ?? "",
+    };
   } catch {
     if (auditContext) {
       await writeAuditLog(env, {
         action: "inbox.access.rejected",
         targetType: "mailbox_access_link",
-        targetId: encryptedToken,
+        targetId: encryptedToken.slice(0, 32),
         ip: auditContext.ip ?? null,
         userAgent: auditContext.userAgent ?? null,
         metadata: {
@@ -72,7 +77,7 @@ export async function validateInboxAccessToken(
       await writeAuditLog(env, {
         action: "inbox.access.rejected",
         targetType: "mailbox_access_link",
-        targetId: encryptedToken,
+        targetId: encryptedToken.slice(0, 32),
         ip: auditContext.ip ?? null,
         userAgent: auditContext.userAgent ?? null,
         metadata: {
@@ -88,7 +93,7 @@ export async function validateInboxAccessToken(
       await writeAuditLog(env, {
         action: "inbox.access.rejected",
         targetType: "mailbox_access_link",
-        targetId: encryptedToken,
+        targetId: encryptedToken.slice(0, 32),
         ip: auditContext.ip ?? null,
         userAgent: auditContext.userAgent ?? null,
         metadata: {
@@ -114,7 +119,8 @@ export async function validateInboxAccessToken(
     throw new AppRouteError(404, "NOT_FOUND", "Mailbox not found.");
   }
 
-  await env.DB.prepare("UPDATE mailbox_access_links SET last_used_at = ? WHERE id = ?")
+  // 异步更新 last_used_at，不阻塞响应
+  env.DB.prepare("UPDATE mailbox_access_links SET last_used_at = ? WHERE id = ?")
     .bind(new Date().toISOString(), encryptedToken)
     .run();
 

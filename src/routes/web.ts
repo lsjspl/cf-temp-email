@@ -513,9 +513,11 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             </p>
           </div>
           <div class="button-row">
-            <a class="button sm ${zhActive ? "primary" : "ghost"}" href="/app?lang=zh-CN" title="切换到中文">中文</a>
-            <a class="button sm ${!zhActive ? "primary" : "ghost"}" href="/app?lang=en" title="Switch to English">EN</a>
-            <button id="refresh-all" class="button" type="button" title="${ui.common.refresh}">${ui.common.refresh}</button>
+            <select class="select" style="width:auto; padding:6px 32px 6px 10px; min-height:30px; font-size:12px;" onchange="location.href=this.value">
+              <option value="/app?lang=zh-CN" ${zhActive ? "selected" : ""}>中文</option>
+              <option value="/app?lang=en" ${!zhActive ? "selected" : ""}>English</option>
+            </select>
+            <button id="refresh-all" class="button" type="button" title="${ui.common.refresh} (r)">${ui.common.refresh}</button>
             <button id="logout" class="button danger" type="button">${ui.common.logout}</button>
           </div>
         </header>
@@ -690,7 +692,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         const UI = __UI__;
         const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
         const DEFAULT_PAGE_SIZE = 20;
-        const AUDIT_DEFAULT_PAGE_SIZE = 50;
+        const AUDIT_DEFAULT_PAGE_SIZE = 5;
         const FULL_PAGE_SIZE = 200;
 
         // 按需加载：追踪已加载的面板
@@ -923,7 +925,7 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         function renderMailboxes() {
           selectors.mailboxList.innerHTML = renderTableWithPagination(
             "mailboxes",
-            [UI.dashboard.email, UI.dashboard.status, UI.inbox.expires, UI.dashboard.accessLink],
+            [UI.dashboard.email, UI.dashboard.status, UI.inbox.expires, UI.dashboard.accessLink, UI.dashboard.actions],
             state.mailboxes.map((item) => [
               copyableMono(item.email_address),
               formatTag(item.status),
@@ -932,6 +934,12 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 ? '<span class="copy-group"><a class="button sm ghost" href="' + escapeAttr(item.encrypted_access_url) + '" target="_blank" rel="noreferrer">' + escapeHtml(UI.common.open) + '</a>' +
                   '<button type="button" class="copy-btn" data-copy="' + escapeAttr(item.encrypted_access_url) + '">' + escapeHtml(UI.common.copy) + '</button></span>'
                 : "-",
+              '<div class="dropdown">' +
+                '<button class="dropdown-toggle" type="button">操作 ▾</button>' +
+                '<div class="dropdown-menu">' +
+                  '<button class="dropdown-item danger" type="button" data-delete-mailbox="' + escapeAttr(item.id) + '" data-mailbox-email="' + escapeAttr(item.email_address) + '">' + escapeHtml(UI.dashboard.delete) + '</button>' +
+                '</div>' +
+              '</div>',
             ]),
           );
         }
@@ -947,7 +955,13 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               timeCell(item.last_used_at),
               item.status === "revoked"
                 ? '<span class="muted">' + escapeHtml(translateLabel("revoked")) + '</span>'
-                : '<button class="button sm danger" type="button" data-revoke-token="' + escapeAttr(item.id) + '" data-token-name="' + escapeAttr(item.name) + '">' + escapeHtml(UI.dashboard.revoke) + '</button>',
+                : '<div class="dropdown">' +
+                    '<button class="dropdown-toggle" type="button">操作 ▾</button>' +
+                    '<div class="dropdown-menu">' +
+                      '<button class="dropdown-item" type="button" data-edit-token="' + escapeAttr(item.id) + '" data-token-obj="' + escapeAttr(JSON.stringify(item)) + '">' + escapeHtml(UI.dashboard.edit) + '</button>' +
+                      '<button class="dropdown-item danger" type="button" data-revoke-token="' + escapeAttr(item.id) + '" data-token-name="' + escapeAttr(item.name) + '">' + escapeHtml(UI.dashboard.revoke) + '</button>' +
+                    '</div>' +
+                  '</div>',
             ]),
           );
         }
@@ -964,11 +978,16 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               formatTag(item.status),
               String(item.assigned_user_count ?? 0),
               CURRENT_USER.role === "admin"
-                ? '<div class="inline-actions">' +
-                    (item.status !== "active"
-                      ? '<button class="button sm" type="button" data-verify-domain="' + escapeAttr(item.id) + '" data-domain-name="' + escapeAttr(item.domain) + '">' + escapeHtml(UI.dashboard.markActive) + '</button>'
-                      : "") +
-                    '<button class="button sm" type="button" data-configure-domain="' + escapeAttr(item.id) + '" data-domain-name="' + escapeAttr(item.domain) + '">' + escapeHtml(UI.dashboard.configureCloudflare) + '</button>' +
+                ? '<div class="dropdown">' +
+                    '<button class="dropdown-toggle" type="button">操作 ▾</button>' +
+                    '<div class="dropdown-menu">' +
+                      '<button class="dropdown-item" type="button" data-edit-domain="' + escapeAttr(item.id) + '" data-domain-obj="' + escapeAttr(JSON.stringify(item)) + '">' + escapeHtml(UI.dashboard.edit) + '</button>' +
+                      (item.status !== "active"
+                        ? '<button class="dropdown-item" type="button" data-verify-domain="' + escapeAttr(item.id) + '" data-domain-name="' + escapeAttr(item.domain) + '">' + escapeHtml(UI.dashboard.markActive) + '</button>'
+                        : '') +
+                      '<button class="dropdown-item" type="button" data-configure-domain="' + escapeAttr(item.id) + '" data-domain-name="' + escapeAttr(item.domain) + '">' + escapeHtml(UI.dashboard.configureCloudflare) + '</button>' +
+                      '<button class="dropdown-item danger" type="button" data-delete-domain="' + escapeAttr(item.id) + '" data-domain-name="' + escapeAttr(item.domain) + '">' + escapeHtml(UI.dashboard.delete) + '</button>' +
+                    '</div>' +
                   '</div>'
                 : "-",
             ]),
@@ -981,22 +1000,29 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             [UI.dashboard.email, UI.dashboard.role, UI.dashboard.status, UI.dashboard.lastLogin, UI.dashboard.actions],
             state.users.map((item) => {
               const isSelf = item.id === CURRENT_USER.id;
-              const toggleLabel = item.status === "active" ? UI.dashboard.disable : UI.dashboard.enable;
-              const deleteBtn = isSelf
-                ? '<span class="pill-chip" title="' + escapeAttr(UI.dashboard.userActionsHint) + '">—</span>'
-                : '<button class="button sm danger" type="button" data-delete-user="' + escapeAttr(item.id) + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(UI.dashboard.delete) + '</button>';
-              const toggleBtn = isSelf
-                ? ""
-                : '<button class="button sm" type="button" data-toggle-user="' + escapeAttr(item.id) + '" data-next-status="' + escapeAttr(item.status === "active" ? "disabled" : "active") + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(toggleLabel) + '</button>';
-              const assignBtn = CURRENT_USER.role === "admin"
-                ? '<button class="button sm" type="button" data-assign-domain-user="' + escapeAttr(item.id) + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(UI.dashboard.assignDomainAction) + '</button>'
-                : "";
+              if (isSelf) {
+                return [
+                  escapeHtml(item.email) + ' <span class="pill-chip">' + escapeHtml(UI.dashboard.youBadge) + '</span>',
+                  formatTag(item.role),
+                  formatTag(item.status),
+                  timeCell(item.last_login_at),
+                  '<span class="pill-chip" title="' + escapeAttr(UI.dashboard.userActionsHint) + '">—</span>',
+                ];
+              }
               return [
-                escapeHtml(item.email) + (isSelf ? ' <span class="pill-chip">' + escapeHtml(UI.dashboard.youBadge) + '</span>' : ''),
+                escapeHtml(item.email),
                 formatTag(item.role),
                 formatTag(item.status),
                 timeCell(item.last_login_at),
-                '<div class="inline-actions">' + assignBtn + toggleBtn + deleteBtn + '</div>',
+                '<div class="dropdown">' +
+                  '<button class="dropdown-toggle" type="button">操作 ▾</button>' +
+                  '<div class="dropdown-menu">' +
+                    '<button class="dropdown-item" type="button" data-assign-domain-user="' + escapeAttr(item.id) + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(UI.dashboard.assignDomainAction) + '</button>' +
+                    '<button class="dropdown-item" type="button" data-edit-user="' + escapeAttr(item.id) + '" data-user-obj="' + escapeAttr(JSON.stringify(item)) + '">' + escapeHtml(UI.dashboard.edit) + '</button>' +
+                    '<button class="dropdown-item" type="button" data-toggle-user="' + escapeAttr(item.id) + '" data-next-status="' + escapeAttr(item.status === "active" ? "disabled" : "active") + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(item.status === "active" ? UI.dashboard.disable : UI.dashboard.enable) + '</button>' +
+                    '<button class="dropdown-item danger" type="button" data-delete-user="' + escapeAttr(item.id) + '" data-user-email="' + escapeAttr(item.email) + '">' + escapeHtml(UI.dashboard.delete) + '</button>' +
+                  '</div>' +
+                '</div>',
               ];
             }),
           );
@@ -1242,17 +1268,28 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         async function loadPanelData(panel) {
           switch (panel) {
             case "overview":
-              await Promise.all([
-                reloadUserDomains(),
-                reloadTokens(),
-                reloadMailboxes(),
-                ...(CURRENT_USER.role === "admin" ? [
-                  reloadAdminUsers(),
-                  reloadAdminDomains(),
-                  reloadAdminMailboxes(),
-                  reloadAdminMessages(),
-                ] : []),
-              ]);
+              // 概览只需要获取各项总数，用 page_size=1 最小化数据传输
+              if (CURRENT_USER.role === "admin") {
+                const [usersRes, domainsRes, mailboxesRes, messagesRes] = await Promise.all([
+                  request("/admin/users?page=1&page_size=1"),
+                  request("/admin/domains?page=1&page_size=1"),
+                  request("/admin/mailboxes?page=1&page_size=1"),
+                  request("/admin/messages?page=1&page_size=1"),
+                ]);
+                state.pagination.users.total = usersRes.pagination?.total ?? 0;
+                state.pagination.allDomains.total = domainsRes.pagination?.total ?? 0;
+                state.pagination.adminMailboxes.total = mailboxesRes.pagination?.total ?? 0;
+                state.pagination.adminMessages.total = messagesRes.pagination?.total ?? 0;
+              } else {
+                const [domainsRes, tokensRes, mailboxesRes] = await Promise.all([
+                  request("/user/domains?page=1&page_size=1"),
+                  request("/user/api-tokens?page=1&page_size=1"),
+                  request("/user/mailboxes?page=1&page_size=1"),
+                ]);
+                state.pagination.userDomains.total = domainsRes.pagination?.total ?? 0;
+                state.pagination.tokens.total = tokensRes.pagination?.total ?? 0;
+                state.pagination.mailboxes.total = mailboxesRes.pagination?.total ?? 0;
+              }
               renderMetrics();
               break;
             case "mailboxes":
@@ -1497,6 +1534,49 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
         // --- Revoke user token ---
         selectors.tokenList.addEventListener("click", async (event) => {
+          // 下拉菜单切换
+          const dropdownToggle = event.target.closest(".dropdown-toggle");
+          if (dropdownToggle) {
+            event.stopPropagation();
+            const dropdown = dropdownToggle.closest(".dropdown");
+            const wasOpen = dropdown.classList.contains("open");
+            document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
+            if (!wasOpen) dropdown.classList.add("open");
+            return;
+          }
+
+          // 编辑 Token
+          const editTarget = event.target.closest("[data-edit-token]");
+          if (editTarget) {
+            const tokenObj = JSON.parse(editTarget.getAttribute("data-token-obj") || "{}");
+            const bodyNode = document.createElement("div");
+            bodyNode.innerHTML =
+              '<div class="field-grid">' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.name) + '</label><input class="input" id="modal-edit-token-name" value="' + escapeAttr(tokenObj.name || "") + '" /></div>' +
+              '</div>';
+            const ok = await window.confirmModal({
+              title: UI.dashboard.editToken,
+              body: bodyNode,
+              confirmText: UI.common.save,
+              cancelText: UI.common.cancel,
+            });
+            if (!ok) return;
+            const name = document.getElementById("modal-edit-token-name")?.value?.trim();
+            if (!name) { window.toast(UI.common.requestFailed, "error"); return; }
+            try {
+              await request("/user/api-tokens/" + tokenObj.id, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name }),
+              });
+              window.toast(UI.dashboard.tokenCreated, "ok");
+              await loadData();
+            } catch (error) {
+              window.toast(error.message, "error");
+            }
+            return;
+          }
+
           const target = event.target.closest("[data-revoke-token]");
           if (!target) return;
           const name = target.getAttribute("data-token-name") || "";
@@ -1511,6 +1591,40 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             try {
               await request("/user/api-tokens/" + target.getAttribute("data-revoke-token"), { method: "DELETE" });
               window.toast(UI.dashboard.tokenRevoked, "ok");
+              await loadData();
+            } catch (error) {
+              window.toast(error.message, "error");
+            }
+          });
+        });
+
+        // --- Mailbox delete ---
+        selectors.mailboxList.addEventListener("click", async (event) => {
+          // 下拉菜单切换
+          const dropdownToggle = event.target.closest(".dropdown-toggle");
+          if (dropdownToggle) {
+            event.stopPropagation();
+            const dropdown = dropdownToggle.closest(".dropdown");
+            const wasOpen = dropdown.classList.contains("open");
+            document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
+            if (!wasOpen) dropdown.classList.add("open");
+            return;
+          }
+
+          const deleteTarget = event.target.closest("[data-delete-mailbox]");
+          if (!deleteTarget) return;
+          const email = deleteTarget.getAttribute("data-mailbox-email") || "";
+          const ok = await window.confirmModal({
+            title: UI.dashboard.confirmDeleteMailboxTitle,
+            body: UI.dashboard.confirmDeleteMailboxBody + (email ? "\\n\\n" + email : ""),
+            confirmText: UI.dashboard.delete,
+            tone: "danger",
+          });
+          if (!ok) return;
+          await window.withButtonLoading(deleteTarget, UI.dashboard.delete, async () => {
+            try {
+              await request("/user/mailboxes/" + deleteTarget.getAttribute("data-delete-mailbox"), { method: "DELETE" });
+              window.toast(UI.dashboard.mailboxDeleted, "ok");
               await loadData();
             } catch (error) {
               window.toast(error.message, "error");
@@ -1545,6 +1659,75 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
         // --- Domain actions ---
         selectors.domainList.addEventListener("click", async (event) => {
+          // 下拉菜单切换
+          const dropdownToggle = event.target.closest(".dropdown-toggle");
+          if (dropdownToggle) {
+            event.stopPropagation();
+            const dropdown = dropdownToggle.closest(".dropdown");
+            const wasOpen = dropdown.classList.contains("open");
+            // 关闭所有其他下拉菜单
+            document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
+            if (!wasOpen) dropdown.classList.add("open");
+            return;
+          }
+
+          // 编辑域名
+          const editTarget = event.target.closest("[data-edit-domain]");
+          if (editTarget) {
+            const domainObj = JSON.parse(editTarget.getAttribute("data-domain-obj") || "{}");
+            const bodyNode = document.createElement("div");
+            bodyNode.innerHTML =
+              '<div class="field-grid">' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.domain) + '</label><input class="input" id="modal-edit-domain-name" value="' + escapeAttr(domainObj.domain || "") + '" disabled /></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.type) + '</label><select class="select" id="modal-edit-domain-type"><option value="subdomain" ' + (domainObj.type === "subdomain" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.subdomain) + '</option><option value="root" ' + (domainObj.type === "root" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.root) + '</option></select></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.status) + '</label><select class="select" id="modal-edit-domain-status"><option value="pending" ' + (domainObj.status === "pending" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.pending) + '</option><option value="active" ' + (domainObj.status === "active" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.active) + '</option></select></div>' +
+              '</div>';
+            const ok = await window.confirmModal({
+              title: UI.dashboard.editDomain,
+              body: bodyNode,
+              confirmText: UI.common.save,
+              cancelText: UI.common.cancel,
+            });
+            if (!ok) return;
+            const type = document.getElementById("modal-edit-domain-type")?.value;
+            const status = document.getElementById("modal-edit-domain-status")?.value;
+            try {
+              await request("/admin/domains/" + domainObj.id, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type, status }),
+              });
+              window.toast(UI.dashboard.domainUpdated, "ok");
+              await loadData();
+            } catch (error) {
+              window.toast(error.message, "error");
+            }
+            return;
+          }
+
+          // 删除域名
+          const deleteTarget = event.target.closest("[data-delete-domain]");
+          if (deleteTarget) {
+            const domain = deleteTarget.getAttribute("data-domain-name") || "";
+            const ok = await window.confirmModal({
+              title: UI.dashboard.confirmDeleteDomainTitle,
+              body: UI.dashboard.confirmDeleteDomainBody + (domain ? "\\n\\n" + domain : ""),
+              confirmText: UI.dashboard.delete,
+              tone: "danger",
+            });
+            if (!ok) return;
+            await window.withButtonLoading(deleteTarget, UI.dashboard.delete, async () => {
+              try {
+                await request("/admin/domains/" + deleteTarget.getAttribute("data-delete-domain"), { method: "DELETE" });
+                window.toast(UI.dashboard.domainDeleted, "ok");
+                await loadData();
+              } catch (error) {
+                window.toast(error.message, "error");
+              }
+            });
+            return;
+          }
+
           const verifyTarget = event.target.closest("[data-verify-domain]");
           if (verifyTarget) {
             const domain = verifyTarget.getAttribute("data-domain-name") || "";
@@ -1663,7 +1846,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             '<div class="field-grid">' +
               '<div class="field"><label>' + escapeHtml(UI.dashboard.domain) + '</label><input class="input" id="modal-domain-name" placeholder="' + escapeAttr(UI.dashboard.domainPlaceholder) + '" /></div>' +
               '<div class="field"><label>' + escapeHtml(UI.dashboard.type) + '</label><select class="select" id="modal-domain-type"><option value="subdomain">' + escapeHtml(UI.dashboard.statusLabels.subdomain) + '</option><option value="root">' + escapeHtml(UI.dashboard.statusLabels.root) + '</option></select></div>' +
-              '<div class="field"><label>' + escapeHtml(UI.dashboard.status) + '</label><select class="select" id="modal-domain-status"><option value="pending">' + escapeHtml(UI.dashboard.statusLabels.pending) + '</option><option value="active">' + escapeHtml(UI.dashboard.statusLabels.active) + '</option></select></div>' +
             '</div>';
           const ok = await window.confirmModal({
             title: UI.dashboard.addDomain,
@@ -1674,15 +1856,27 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           if (!ok) return;
           const domain = document.getElementById("modal-domain-name")?.value?.trim();
           const type = document.getElementById("modal-domain-type")?.value;
-          const status = document.getElementById("modal-domain-status")?.value;
           if (!domain) { window.toast(UI.common.requestFailed, "error"); return; }
           try {
-            await request("/admin/domains", {
+            // 创建域名时自动设置为 active 状态
+            const createResult = await request("/admin/domains", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ domain, type, status }),
+              body: JSON.stringify({ domain, type, status: "active" }),
             });
             window.toast(UI.dashboard.domainCreated, "ok");
+            
+            // 自动配置 Cloudflare
+            if (createResult?.domain?.id) {
+              try {
+                await request("/admin/domains/" + createResult.domain.id + "/configure-cloudflare", { method: "POST" });
+                window.toast(UI.dashboard.cloudflareConfigured, "ok");
+              } catch (cfError) {
+                // Cloudflare 配置失败不影响域名创建
+                window.toast(UI.dashboard.domainCreated + "，但 Cloudflare 配置失败：" + cfError.message, "warn", 5000);
+              }
+            }
+            
             await loadData();
           } catch (error) {
             showFeedback("domain-feedback", error.message, "error");
@@ -1749,6 +1943,55 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
         // --- Assign domain to user (from user list) ---
         selectors.userList.addEventListener("click", async (event) => {
+          // 下拉菜单切换
+          const dropdownToggle = event.target.closest(".dropdown-toggle");
+          if (dropdownToggle) {
+            event.stopPropagation();
+            const dropdown = dropdownToggle.closest(".dropdown");
+            const wasOpen = dropdown.classList.contains("open");
+            document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
+            if (!wasOpen) dropdown.classList.add("open");
+            return;
+          }
+
+          // 编辑用户
+          const editTarget = event.target.closest("[data-edit-user]");
+          if (editTarget) {
+            const userObj = JSON.parse(editTarget.getAttribute("data-user-obj") || "{}");
+            const bodyNode = document.createElement("div");
+            bodyNode.innerHTML =
+              '<div class="field-grid">' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.email) + '</label><input class="input" id="modal-edit-user-email" type="email" value="' + escapeAttr(userObj.email || "") + '" /></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.username) + '</label><input class="input" id="modal-edit-user-username" value="' + escapeAttr(userObj.username || "") + '" /></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.role) + '</label><select class="select" id="modal-edit-user-role"><option value="user" ' + (userObj.role === "user" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.user) + '</option><option value="admin" ' + (userObj.role === "admin" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.admin) + '</option></select></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.status) + '</label><select class="select" id="modal-edit-user-status"><option value="active" ' + (userObj.status === "active" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.active) + '</option><option value="disabled" ' + (userObj.status === "disabled" ? "selected" : "") + '>' + escapeHtml(UI.dashboard.statusLabels.disabled) + '</option></select></div>' +
+              '</div>';
+            const ok = await window.confirmModal({
+              title: UI.dashboard.editUser,
+              body: bodyNode,
+              confirmText: UI.common.save,
+              cancelText: UI.common.cancel,
+            });
+            if (!ok) return;
+            const email = document.getElementById("modal-edit-user-email")?.value?.trim();
+            const username = document.getElementById("modal-edit-user-username")?.value?.trim();
+            const role = document.getElementById("modal-edit-user-role")?.value;
+            const status = document.getElementById("modal-edit-user-status")?.value;
+            if (!email || !username) { window.toast(UI.common.requestFailed, "error"); return; }
+            try {
+              await request("/admin/users/" + userObj.id, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, username, role, status }),
+              });
+              window.toast(UI.dashboard.userUpdated, "ok");
+              await loadData();
+            } catch (error) {
+              window.toast(error.message, "error");
+            }
+            return;
+          }
+
           const assignBtn = event.target.closest("[data-assign-domain-user]");
           if (assignBtn) {
             const userId = assignBtn.getAttribute("data-assign-domain-user");
@@ -1759,30 +2002,65 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
               window.toast(UI.dashboard.noActiveDomains, "warn");
               return;
             }
-            const domainOptions = activeDomains.map((d) =>
-              '<option value="' + escapeAttr(d.id) + '">' + escapeHtml(d.domain) + '</option>'
-            ).join("");
+            // 获取用户已分配的域名
+            let assignedDomainIds = new Set();
+            try {
+              const userDomainsRes = await request("/admin/users/" + userId + "/domains?page=1&page_size=200");
+              assignedDomainIds = new Set((userDomainsRes.domains || []).map((d) => d.id));
+            } catch (e) { /* ignore */ }
+            
+            const checkboxList = activeDomains.map((d) => {
+              const checked = assignedDomainIds.has(d.id) ? " checked" : "";
+              return '<label style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer; transition:background 140ms;" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'transparent\'">' +
+                '<input type="checkbox" value="' + escapeAttr(d.id) + '" class="domain-checkbox"' + checked + ' style="width:16px; height:16px; accent-color:var(--accent);" />' +
+                '<span class="mono" style="font-size:13px;">' + escapeHtml(d.domain) + '</span>' +
+              '</label>';
+            }).join("");
+            
             const bodyNode = document.createElement("div");
             bodyNode.innerHTML =
               '<div class="field-grid">' +
                 '<div class="field"><label>' + escapeHtml(UI.dashboard.assignUser) + '</label><div class="mono">' + escapeHtml(userEmail) + '</div></div>' +
-                '<div class="field"><label>' + escapeHtml(UI.dashboard.assignDomain) + '</label><select class="select" id="modal-assign-domain">' + domainOptions + '</select></div>' +
+                '<div class="field"><label>' + escapeHtml(UI.dashboard.assignDomain) + '</label>' +
+                  '<div id="modal-domain-checkboxes" style="max-height:240px; overflow-y:auto; border:1px solid var(--line); border-radius:6px; padding:4px;">' +
+                    checkboxList +
+                  '</div>' +
+                '</div>' +
               '</div>';
             const ok = await window.confirmModal({
               title: UI.dashboard.assignDomainAction,
               body: bodyNode,
-              confirmText: UI.dashboard.assignDomainAction,
+              confirmText: UI.common.save,
               cancelText: UI.common.cancel,
             });
             if (!ok) return;
-            const domainId = document.getElementById("modal-assign-domain")?.value;
-            if (!domainId) return;
+            
+            const checkboxes = document.querySelectorAll("#modal-domain-checkboxes .domain-checkbox");
+            const selectedIds = new Set();
+            checkboxes.forEach((cb) => { if (cb.checked) selectedIds.add(cb.value); });
+            
+            // 计算需要添加和移除的域名
+            const toAdd = [...selectedIds].filter((id) => !assignedDomainIds.has(id));
+            const toRemove = [...assignedDomainIds].filter((id) => !selectedIds.has(id));
+            
+            if (toAdd.length === 0 && toRemove.length === 0) {
+              window.toast(UI.dashboard.userUpdated, "ok");
+              return;
+            }
+            
             try {
-              await request("/admin/users/" + userId + "/domains", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain_id: domainId }),
-              });
+              for (const domainId of toAdd) {
+                await request("/admin/users/" + userId + "/domains", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ domain_id: domainId }),
+                });
+              }
+              for (const domainId of toRemove) {
+                await request("/admin/users/" + userId + "/domains/" + domainId, {
+                  method: "DELETE",
+                });
+              }
               window.toast(UI.dashboard.domainAssigned, "ok");
               await loadData();
             } catch (error) {
@@ -1898,6 +2176,13 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
             event.preventDefault();
             loadAllData({ showToast: true });
+          }
+        });
+
+        // 全局点击关闭下拉菜单
+        document.addEventListener("click", (event) => {
+          if (!event.target.closest(".dropdown")) {
+            document.querySelectorAll(".dropdown.open").forEach((d) => d.classList.remove("open"));
           }
         });
 
