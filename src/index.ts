@@ -91,7 +91,7 @@ app.get("/inbox/:encryptedToken/attachments/:attachmentId", async (c) => {
   });
 });
 
-app.notFound((c) => {
+app.notFound(async (c) => {
   // API 路径返回 JSON 404
   const path = new URL(c.req.url).pathname;
   if (
@@ -99,13 +99,12 @@ app.notFound((c) => {
     path.startsWith("/admin/") ||
     path.startsWith("/user/") ||
     path.startsWith("/api/") ||
-    path.startsWith("/setup/") ||
-    (path.startsWith("/inbox/") && path.includes("/messages"))
+    path.startsWith("/setup/")
   ) {
     return errorResponse(c, 404, "NOT_FOUND", "Not Found");
   }
-  // 其他路径交给 assets（SPA fallback）
-  return c.env.ASSETS.fetch(c.req.raw);
+  // SPA fallback: 返回 index.html
+  return c.env.ASSETS.fetch(new Request(new URL("/index.html", c.req.url), c.req.raw));
 });
 
 app.onError((err, c) => {
