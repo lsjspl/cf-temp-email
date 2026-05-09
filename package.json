@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:frontend": "cd frontend && npx vite",
-    "build:frontend": "cd frontend && npm run build",
-    "deploy": "cd frontend && npm run build && cd .. && wrangler deploy",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "deploy": "cd frontend && npm install && npm run build && cd .. && wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "deploy:worker": "wrangler deploy",
