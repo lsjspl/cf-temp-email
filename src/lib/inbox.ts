@@ -2,6 +2,7 @@ import { decryptJsonToken } from "./crypto";
 import { AppRouteError } from "./errors";
 import { sanitizeHtmlPreview } from "./mail-sanitize";
 import { writeAuditLog } from "./audit";
+import { buildPaginationMeta, type PaginationMeta, type PaginationParams } from "./pagination";
 import { getLinkSecret } from "./runtime-secrets";
 import type { AppEnv } from "../types/env";
 
@@ -123,7 +124,21 @@ export async function validateInboxAccessToken(
   };
 }
 
-export async function listInboxMessages(env: AppEnv, mailboxId: string) {
+export async function listInboxMessages(
+  env: AppEnv,
+  mailboxId: string,
+  pagination: PaginationParams,
+): Promise<{ items: Record<string, unknown>[]; meta: PaginationMeta }> {
+  const totalRow = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM messages
+      WHERE mailbox_id = ?
+    `,
+  )
+    .bind(mailboxId)
+    .first<{ total: number | string }>();
+
   const result = await env.DB.prepare(
     `
       SELECT
@@ -140,15 +155,21 @@ export async function listInboxMessages(env: AppEnv, mailboxId: string) {
       WHERE m.mailbox_id = ?
       GROUP BY m.id
       ORDER BY m.received_at DESC
+      LIMIT ? OFFSET ?
     `,
   )
-    .bind(mailboxId)
+    .bind(mailboxId, pagination.pageSize, pagination.offset)
     .all<Record<string, unknown>>();
 
-  return result.results.map((row) => ({
+  const items = result.results.map((row) => ({
     ...row,
     attachment_count: Number(row.attachment_count ?? 0),
   }));
+
+  return {
+    items,
+    meta: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
+  };
 }
 
 export async function getInboxMessage(env: AppEnv, mailboxId: string, messageId: string) {

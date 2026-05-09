@@ -16,6 +16,7 @@ import { AppRouteError, errorResponse } from "./lib/errors";
 import { attachLocale } from "./lib/i18n";
 import { getInboxAttachment, getInboxMessage, listInboxMessages, validateInboxAccessToken } from "./lib/inbox";
 import { apiRateLimit, inboxRateLimit, loginRateLimit } from "./lib/rate-limit";
+import { parsePagination } from "./lib/pagination";
 import adminApp from "./routes/admin";
 import authApp from "./routes/auth";
 import externalApiApp from "./routes/external-api";
@@ -57,9 +58,12 @@ app.get("/inbox/:encryptedToken/messages", async (c) => {
     ip: c.get("requestIp") ?? null,
     userAgent: c.req.header("User-Agent") ?? null,
   });
+  const pagination = parsePagination(c);
+  const { items, meta } = await listInboxMessages(c.env, mailboxId, pagination);
   return c.json({
     mailbox,
-    messages: await listInboxMessages(c.env, mailboxId),
+    messages: items,
+    pagination: meta,
   });
 });
 

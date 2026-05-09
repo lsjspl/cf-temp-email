@@ -4,6 +4,7 @@ import { getAuditContext, writeAuditLog } from "../lib/audit";
 import { generateId, generateOpaqueToken, sha256Hex } from "../lib/crypto";
 import { requireAuthUser, revokeApiToken } from "../lib/auth";
 import { createMailbox, listMailboxMessages, listUserDomains, listUserMailboxes } from "../lib/mailboxes";
+import { buildPaginationMeta, parsePagination } from "../lib/pagination";
 import { readJsonBody, requireString } from "../lib/request";
 import type { AppSchema } from "../types/app";
 
@@ -11,26 +12,43 @@ const userApp = new Hono<AppSchema>();
 
 userApp.get("/user/domains", async (c) => {
   const user = requireAuthUser(c);
+  const pagination = parsePagination(c);
+  const { items, meta } = await listUserDomains(c.env, user.id, pagination);
   return c.json({
-    domains: await listUserDomains(c.env, user.id),
+    domains: items,
+    pagination: meta,
   });
 });
 
 userApp.get("/user/api-tokens", async (c) => {
   const user = requireAuthUser(c);
+  const pagination = parsePagination(c);
+
+  const totalRow = await c.env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM api_tokens
+      WHERE user_id = ?
+    `,
+  )
+    .bind(user.id)
+    .first<{ total: number | string }>();
+
   const result = await c.env.DB.prepare(
     `
       SELECT id, name, token_prefix, status, last_used_at, created_at, revoked_at
       FROM api_tokens
       WHERE user_id = ?
       ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
     `,
   )
-    .bind(user.id)
+    .bind(user.id, pagination.pageSize, pagination.offset)
     .all<Record<string, unknown>>();
 
   return c.json({
     tokens: result.results,
+    pagination: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
   });
 });
 
@@ -121,8 +139,11 @@ userApp.delete("/user/api-tokens/:id", async (c) => {
 
 userApp.get("/user/mailboxes", async (c) => {
   const user = requireAuthUser(c);
+  const pagination = parsePagination(c);
+  const { items, meta } = await listUserMailboxes(c.env, c.req.url, user.id, pagination);
   return c.json({
-    mailboxes: await listUserMailboxes(c.env, c.req.url, user.id),
+    mailboxes: items,
+    pagination: meta,
   });
 });
 
@@ -148,8 +169,16 @@ userApp.post("/user/mailboxes", async (c) => {
 
 userApp.get("/user/mailboxes/:id/messages", async (c) => {
   const user = requireAuthUser(c);
+  const pagination = parsePagination(c);
+  const { items, meta } = await listMailboxMessages(
+    c.env,
+    user.id,
+    c.req.param("id"),
+    pagination,
+  );
   return c.json({
-    messages: await listMailboxMessages(c.env, user.id, c.req.param("id")),
+    messages: items,
+    pagination: meta,
   });
 });
 

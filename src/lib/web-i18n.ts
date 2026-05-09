@@ -46,6 +46,15 @@ const UI = {
       search: "Search",
       sessionExpired: "Session expired, please sign in again.",
       unsavedPrompt: "You have unsaved changes. Leave the page?",
+      pagination: {
+        prev: "Prev",
+        next: "Next",
+        first: "First",
+        last: "Last",
+        summary: "Page {page} / {totalPages} · {total} total",
+        pageSize: "Per page",
+        jumpTo: "Go to page",
+      },
     },
     login: {
       title: "Temp Mail Login",
@@ -284,6 +293,15 @@ const UI = {
       search: "搜索",
       sessionExpired: "会话已过期，请重新登录。",
       unsavedPrompt: "有未保存的更改，确定要离开吗？",
+      pagination: {
+        prev: "上一页",
+        next: "下一页",
+        first: "首页",
+        last: "末页",
+        summary: "第 {page} / {totalPages} 页 · 共 {total} 条",
+        pageSize: "每页",
+        jumpTo: "跳至",
+      },
     },
     login: {
       title: "临时邮箱登录",

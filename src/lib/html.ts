@@ -884,6 +884,48 @@ export function renderDocument(options: {
         flex-wrap: wrap;
       }
 
+      .pagination {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-top: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .pagination-summary {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .pagination-controls {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .pagination-controls .page-size-select {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+
+      .pagination-controls .page-jump {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line-strong);
+        color: var(--text);
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 12px;
+        width: 72px;
+      }
+
       .pill-chip {
         display: inline-flex;
         align-items: center;

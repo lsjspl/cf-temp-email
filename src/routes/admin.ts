@@ -13,22 +13,33 @@ import {
   removeDomainFromUser,
 } from "../lib/domains";
 import { AppRouteError } from "../lib/errors";
+import { buildPaginationMeta, parsePagination } from "../lib/pagination";
 import { optionalString, readJsonBody } from "../lib/request";
 import type { AppSchema } from "../types/app";
 
 const adminApp = new Hono<AppSchema>();
 
 adminApp.get("/admin/users", async (c) => {
+  const pagination = parsePagination(c);
+
+  const totalRow = await c.env.DB.prepare("SELECT COUNT(*) AS total FROM users").first<{
+    total: number | string;
+  }>();
+
   const result = await c.env.DB.prepare(
     `
       SELECT id, email, username, role, status, created_at, updated_at, last_login_at
       FROM users
       ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
     `,
-  ).all<Record<string, unknown>>();
+  )
+    .bind(pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
 
   return c.json({
     users: result.results,
+    pagination: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
   });
 });
 
@@ -103,6 +114,20 @@ adminApp.delete("/admin/users/:id", async (c) => {
 });
 
 adminApp.get("/admin/users/:id/domains", async (c) => {
+  const pagination = parsePagination(c);
+  const userId = c.req.param("id");
+
+  const totalRow = await c.env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM user_domains ud
+      INNER JOIN domains d ON d.id = ud.domain_id
+      WHERE ud.user_id = ?
+    `,
+  )
+    .bind(userId)
+    .first<{ total: number | string }>();
+
   const result = await c.env.DB.prepare(
     `
       SELECT d.id, d.domain, d.type, d.status, ud.created_at
@@ -110,13 +135,15 @@ adminApp.get("/admin/users/:id/domains", async (c) => {
       INNER JOIN domains d ON d.id = ud.domain_id
       WHERE ud.user_id = ?
       ORDER BY d.domain ASC
+      LIMIT ? OFFSET ?
     `,
   )
-    .bind(c.req.param("id"))
+    .bind(userId, pagination.pageSize, pagination.offset)
     .all<Record<string, unknown>>();
 
   return c.json({
     domains: result.results,
+    pagination: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
   });
 });
 
@@ -162,8 +189,11 @@ adminApp.delete("/admin/users/:id/domains/:domainId", async (c) => {
 });
 
 adminApp.get("/admin/domains", async (c) => {
+  const pagination = parsePagination(c);
+  const { items, meta } = await listDomains(c.env, pagination);
   return c.json({
-    domains: await listDomains(c.env),
+    domains: items,
+    pagination: meta,
   });
 });
 
@@ -238,6 +268,12 @@ adminApp.post("/admin/domains/:id/configure-cloudflare", async (c) => {
 });
 
 adminApp.get("/admin/mailboxes", async (c) => {
+  const pagination = parsePagination(c);
+
+  const totalRow = await c.env.DB.prepare("SELECT COUNT(*) AS total FROM mailboxes").first<{
+    total: number | string;
+  }>();
+
   const result = await c.env.DB.prepare(
     `
       SELECT
@@ -254,17 +290,24 @@ adminApp.get("/admin/mailboxes", async (c) => {
       INNER JOIN users u ON u.id = m.user_id
       INNER JOIN domains d ON d.id = m.domain_id
       ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
     `,
-  ).all<Record<string, unknown>>();
+  )
+    .bind(pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
 
   return c.json({
     mailboxes: result.results,
+    pagination: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
   });
 });
 
 adminApp.get("/admin/api-tokens", async (c) => {
+  const pagination = parsePagination(c);
+  const { items, meta } = await listAllApiTokens(c.env, pagination);
   return c.json({
-    tokens: await listAllApiTokens(c.env),
+    tokens: items,
+    pagination: meta,
   });
 });
 
@@ -291,6 +334,12 @@ adminApp.post("/admin/api-tokens/:id/revoke", async (c) => {
 });
 
 adminApp.get("/admin/messages", async (c) => {
+  const pagination = parsePagination(c);
+
+  const totalRow = await c.env.DB.prepare("SELECT COUNT(*) AS total FROM messages").first<{
+    total: number | string;
+  }>();
+
   const result = await c.env.DB.prepare(
     `
       SELECT
@@ -306,26 +355,39 @@ adminApp.get("/admin/messages", async (c) => {
       INNER JOIN mailboxes mb ON mb.id = m.mailbox_id
       INNER JOIN users u ON u.id = mb.user_id
       ORDER BY m.received_at DESC
+      LIMIT ? OFFSET ?
     `,
-  ).all<Record<string, unknown>>();
+  )
+    .bind(pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
 
   return c.json({
     messages: result.results,
+    pagination: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
   });
 });
 
 adminApp.get("/admin/audit-logs", async (c) => {
+  const pagination = parsePagination(c, { defaultPageSize: 50 });
+
+  const totalRow = await c.env.DB.prepare("SELECT COUNT(*) AS total FROM audit_logs").first<{
+    total: number | string;
+  }>();
+
   const result = await c.env.DB.prepare(
     `
       SELECT id, actor_user_id, action, target_type, target_id, ip, user_agent, metadata_json, created_at
       FROM audit_logs
       ORDER BY created_at DESC
-      LIMIT 200
+      LIMIT ? OFFSET ?
     `,
-  ).all<Record<string, unknown>>();
+  )
+    .bind(pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
 
   return c.json({
     audit_logs: result.results,
+    pagination: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
   });
 });
 

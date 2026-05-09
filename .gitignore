@@ -7,3 +7,5 @@ npm-debug.log*
 .manual-debug-1778257522253/
 .dev.vars
 *smoke-run.log
+manual-smoke/wrangler.out.log
+.wrangler-dev.log

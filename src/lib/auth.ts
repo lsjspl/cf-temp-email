@@ -3,6 +3,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 
 import { generateId, generateOpaqueToken, hashPassword, sha256Hex, verifyPassword } from "./crypto";
 import { AppRouteError, errorResponse } from "./errors";
+import { buildPaginationMeta, type PaginationMeta, type PaginationParams } from "./pagination";
 import { optionalString, requireString, validateEmailAddress, validatePassword } from "./request";
 import { getSessionSecret } from "./runtime-secrets";
 import type { AppSchema, AuthMode } from "../types/app";
@@ -366,7 +367,17 @@ export async function revokeApiToken(
   return row ?? null;
 }
 
-export async function listAllApiTokens(env: AppEnv) {
+export async function listAllApiTokens(
+  env: AppEnv,
+  pagination: PaginationParams,
+): Promise<{ items: Record<string, unknown>[]; meta: PaginationMeta }> {
+  const totalRow = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM api_tokens
+    `,
+  ).first<{ total: number | string }>();
+
   const result = await env.DB.prepare(
     `
       SELECT
@@ -382,10 +393,16 @@ export async function listAllApiTokens(env: AppEnv) {
       FROM api_tokens t
       INNER JOIN users u ON u.id = t.user_id
       ORDER BY t.created_at DESC
+      LIMIT ? OFFSET ?
     `,
-  ).all<Record<string, unknown>>();
+  )
+    .bind(pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
 
-  return result.results;
+  return {
+    items: result.results,
+    meta: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
+  };
 }
 
 export const attachRequestMetadata: MiddlewareHandler<AppSchema> = async (c, next) => {

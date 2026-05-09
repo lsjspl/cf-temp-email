@@ -1,5 +1,6 @@
 import { encryptJsonToken, generateId, randomLocalPart, sha256Hex } from "./crypto";
 import { AppRouteError } from "./errors";
+import { buildPaginationMeta, type PaginationMeta, type PaginationParams } from "./pagination";
 import { optionalString, requireString } from "./request";
 import { getLinkSecret } from "./runtime-secrets";
 import type { AppEnv } from "../types/env";
@@ -209,7 +210,22 @@ export async function createMailbox(
   };
 }
 
-export async function listUserDomains(env: AppEnv, userId: string) {
+export async function listUserDomains(
+  env: AppEnv,
+  userId: string,
+  pagination: PaginationParams,
+): Promise<{ items: Record<string, unknown>[]; meta: PaginationMeta }> {
+  const totalRow = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM user_domains ud
+      INNER JOIN domains d ON d.id = ud.domain_id
+      WHERE ud.user_id = ?
+    `,
+  )
+    .bind(userId)
+    .first<{ total: number | string }>();
+
   const result = await env.DB.prepare(
     `
       SELECT d.id, d.domain, d.type, d.status, d.created_at, d.updated_at
@@ -217,15 +233,34 @@ export async function listUserDomains(env: AppEnv, userId: string) {
       INNER JOIN user_domains ud ON ud.domain_id = d.id
       WHERE ud.user_id = ?
       ORDER BY d.domain ASC
+      LIMIT ? OFFSET ?
+    `,
+  )
+    .bind(userId, pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
+
+  return {
+    items: result.results,
+    meta: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
+  };
+}
+
+export async function listUserMailboxes(
+  env: AppEnv,
+  requestUrl: string,
+  userId: string,
+  pagination: PaginationParams,
+) {
+  const totalRow = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM mailboxes
+      WHERE user_id = ?
     `,
   )
     .bind(userId)
-    .all<Record<string, unknown>>();
+    .first<{ total: number | string }>();
 
-  return result.results;
-}
-
-export async function listUserMailboxes(env: AppEnv, requestUrl: string, userId: string) {
   const result = await env.DB.prepare(
     `
       SELECT
@@ -248,12 +283,13 @@ export async function listUserMailboxes(env: AppEnv, requestUrl: string, userId:
       INNER JOIN domains d ON d.id = m.domain_id
       WHERE m.user_id = ?
       ORDER BY m.created_at DESC
+      LIMIT ? OFFSET ?
     `,
   )
-    .bind(userId)
+    .bind(userId, pagination.pageSize, pagination.offset)
     .all<MailboxRow>();
 
-  return result.results.map((row) => ({
+  const items = result.results.map((row) => ({
     id: row.id,
     email_address: row.email_address,
     local_part: row.local_part,
@@ -266,9 +302,19 @@ export async function listUserMailboxes(env: AppEnv, requestUrl: string, userId:
       ? mailboxLinkUrl(requestUrl, row.encrypted_token)
       : null,
   }));
+
+  return {
+    items,
+    meta: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
+  };
 }
 
-export async function listMailboxMessages(env: AppEnv, userId: string, mailboxId: string) {
+export async function listMailboxMessages(
+  env: AppEnv,
+  userId: string,
+  mailboxId: string,
+  pagination: PaginationParams,
+) {
   const mailbox = await env.DB.prepare(
     `
       SELECT id
@@ -283,6 +329,16 @@ export async function listMailboxMessages(env: AppEnv, userId: string, mailboxId
   if (!mailbox) {
     throw new AppRouteError(404, "NOT_FOUND", "Mailbox not found.");
   }
+
+  const totalRow = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM messages
+      WHERE mailbox_id = ?
+    `,
+  )
+    .bind(mailboxId)
+    .first<{ total: number | string }>();
 
   const result = await env.DB.prepare(
     `
@@ -300,12 +356,13 @@ export async function listMailboxMessages(env: AppEnv, userId: string, mailboxId
       WHERE m.mailbox_id = ?
       GROUP BY m.id
       ORDER BY m.received_at DESC
+      LIMIT ? OFFSET ?
     `,
   )
-    .bind(mailboxId)
+    .bind(mailboxId, pagination.pageSize, pagination.offset)
     .all<MessageRow>();
 
-  return result.results.map((row) => ({
+  const items = result.results.map((row) => ({
     id: row.id,
     from_address: row.from_address,
     to_address: row.to_address,
@@ -315,4 +372,9 @@ export async function listMailboxMessages(env: AppEnv, userId: string, mailboxId
     expires_at: row.expires_at,
     attachment_count: Number(row.attachment_count ?? 0),
   }));
+
+  return {
+    items,
+    meta: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
+  };
 }

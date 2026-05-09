@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { requireApiTokenId, requireAuthUser } from "../lib/auth";
 import { getAuditContext, writeAuditLog } from "../lib/audit";
 import { createMailbox, listMailboxMessages, listUserMailboxes } from "../lib/mailboxes";
+import { parsePagination } from "../lib/pagination";
 import { readJsonBody } from "../lib/request";
 import type { AppSchema } from "../types/app";
 
@@ -31,15 +32,26 @@ externalApiApp.post("/api/v1/mailboxes", async (c) => {
 
 externalApiApp.get("/api/v1/mailboxes", async (c) => {
   const user = requireAuthUser(c);
+  const pagination = parsePagination(c);
+  const { items, meta } = await listUserMailboxes(c.env, c.req.url, user.id, pagination);
   return c.json({
-    mailboxes: await listUserMailboxes(c.env, c.req.url, user.id),
+    mailboxes: items,
+    pagination: meta,
   });
 });
 
 externalApiApp.get("/api/v1/mailboxes/:id/messages", async (c) => {
   const user = requireAuthUser(c);
+  const pagination = parsePagination(c);
+  const { items, meta } = await listMailboxMessages(
+    c.env,
+    user.id,
+    c.req.param("id"),
+    pagination,
+  );
   return c.json({
-    messages: await listMailboxMessages(c.env, user.id, c.req.param("id")),
+    messages: items,
+    pagination: meta,
   });
 });
 

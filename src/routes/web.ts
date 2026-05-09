@@ -703,18 +703,44 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
         const CURRENT_USER = ${jsonForScript(user)};
         const UI = __UI__;
+        const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+        const DEFAULT_PAGE_SIZE = 20;
+        const AUDIT_DEFAULT_PAGE_SIZE = 50;
+        const FULL_PAGE_SIZE = 200;
+
+        function createPagination(pageSize) {
+          return { page: 1, pageSize: pageSize || DEFAULT_PAGE_SIZE, total: 0, totalPages: 1 };
+        }
+
         const state = {
           users: [],
+          usersAll: [],
           userDomains: [],
+          userDomainsAll: [],
           allDomains: [],
+          allDomainsAll: [],
           tokens: [],
           mailboxes: [],
+          mailboxesAll: [],
           mailboxMessages: [],
+          mailboxMessagesMailboxId: "",
           adminMailboxes: [],
           adminMessages: [],
           adminTokens: [],
           audits: [],
           cloudflareStatus: null,
+          pagination: {
+            users: createPagination(),
+            userDomains: createPagination(),
+            allDomains: createPagination(),
+            tokens: createPagination(),
+            mailboxes: createPagination(),
+            mailboxMessages: createPagination(),
+            adminMailboxes: createPagination(),
+            adminMessages: createPagination(),
+            adminTokens: createPagination(),
+            audits: createPagination(AUDIT_DEFAULT_PAGE_SIZE),
+          },
         };
 
         const selectors = {
@@ -829,19 +855,60 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             '</tbody></table>';
         }
 
+        function formatPaginationSummary(meta) {
+          return UI.common.pagination.summary
+            .replace("{page}", String(meta.page))
+            .replace("{totalPages}", String(Math.max(1, meta.totalPages || 1)))
+            .replace("{total}", String(meta.total || 0));
+        }
+
+        function renderPagination(key) {
+          const meta = state.pagination[key];
+          if (!meta) return "";
+          const totalPages = Math.max(1, meta.totalPages || 1);
+          const page = Math.min(Math.max(1, meta.page || 1), totalPages);
+          const disabledPrev = page <= 1 ? " disabled" : "";
+          const disabledNext = page >= totalPages ? " disabled" : "";
+
+          const sizeOptions = PAGE_SIZE_OPTIONS
+            .map((size) => '<option value="' + size + '"' + (size === meta.pageSize ? " selected" : "") + '>' + size + '</option>')
+            .join("");
+
+          return '<div class="pagination">' +
+            '<div class="pagination-summary">' + escapeHtml(formatPaginationSummary({
+              page,
+              totalPages,
+              total: meta.total,
+            })) + '</div>' +
+            '<div class="pagination-controls">' +
+              '<label class="pagination-summary" style="margin-right:4px;">' + escapeHtml(UI.common.pagination.pageSize) + '</label>' +
+              '<select class="page-size-select" data-page-size="' + escapeAttr(key) + '">' + sizeOptions + '</select>' +
+              '<button type="button" class="button sm ghost" data-page-action="first" data-page-key="' + escapeAttr(key) + '"' + disabledPrev + '>' + escapeHtml(UI.common.pagination.first) + '</button>' +
+              '<button type="button" class="button sm ghost" data-page-action="prev" data-page-key="' + escapeAttr(key) + '"' + disabledPrev + '>' + escapeHtml(UI.common.pagination.prev) + '</button>' +
+              '<input type="number" min="1" max="' + totalPages + '" value="' + page + '" class="page-jump" data-page-jump="' + escapeAttr(key) + '" aria-label="' + escapeAttr(UI.common.pagination.jumpTo) + '" />' +
+              '<button type="button" class="button sm ghost" data-page-action="next" data-page-key="' + escapeAttr(key) + '"' + disabledNext + '>' + escapeHtml(UI.common.pagination.next) + '</button>' +
+              '<button type="button" class="button sm ghost" data-page-action="last" data-page-key="' + escapeAttr(key) + '"' + disabledNext + '>' + escapeHtml(UI.common.pagination.last) + '</button>' +
+            '</div>' +
+          '</div>';
+        }
+
+        function renderTableWithPagination(paginationKey, headers, rows, emptyHint) {
+          return renderTable(headers, rows, emptyHint) + renderPagination(paginationKey);
+        }
+
         function renderMetrics() {
           const cards = CURRENT_USER.role === "admin"
             ? [
-                { label: UI.dashboard.metricUsers, value: state.users.length },
-                { label: UI.dashboard.metricDomains, value: state.allDomains.length },
-                { label: UI.dashboard.allMailboxes, value: state.adminMailboxes.length },
-                { label: UI.dashboard.allMessages, value: state.adminMessages.length },
+                { label: UI.dashboard.metricUsers, value: state.pagination.users.total || state.users.length },
+                { label: UI.dashboard.metricDomains, value: state.pagination.allDomains.total || state.allDomains.length },
+                { label: UI.dashboard.allMailboxes, value: state.pagination.adminMailboxes.total || state.adminMailboxes.length },
+                { label: UI.dashboard.allMessages, value: state.pagination.adminMessages.total || state.adminMessages.length },
               ]
             : [
-                { label: UI.dashboard.metricMyDomains, value: state.userDomains.length },
-                { label: UI.dashboard.metricMyTokens, value: state.tokens.length },
-                { label: UI.dashboard.metricMyMailboxes, value: state.mailboxes.length },
-                { label: UI.dashboard.metricMailboxMessages, value: state.mailboxMessages.length },
+                { label: UI.dashboard.metricMyDomains, value: state.pagination.userDomains.total || state.userDomains.length },
+                { label: UI.dashboard.metricMyTokens, value: state.pagination.tokens.total || state.tokens.length },
+                { label: UI.dashboard.metricMyMailboxes, value: state.pagination.mailboxes.total || state.mailboxes.length },
+                { label: UI.dashboard.metricMailboxMessages, value: state.pagination.mailboxMessages.total || state.mailboxMessages.length },
               ];
 
           selectors.metrics.innerHTML = cards.map((item) =>
@@ -858,7 +925,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         }
 
         function renderMailboxes() {
-          selectors.mailboxList.innerHTML = renderTable(
+          selectors.mailboxList.innerHTML = renderTableWithPagination(
+            "mailboxes",
             [UI.dashboard.email, UI.dashboard.status, UI.inbox.expires, UI.dashboard.accessLink],
             state.mailboxes.map((item) => [
               copyableMono(item.email_address),
@@ -872,27 +940,30 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           );
 
           const mailboxDomain = document.getElementById("mailbox-domain");
-          if (state.userDomains.length === 0) {
+          const domainOptionsSource = state.userDomainsAll.length ? state.userDomainsAll : state.userDomains;
+          if (domainOptionsSource.length === 0) {
             mailboxDomain.innerHTML = '<option value="">' + escapeHtml(UI.dashboard.noDomainsAvailable) + '</option>';
             mailboxDomain.disabled = true;
             document.getElementById("mailbox-submit").disabled = true;
           } else {
-            mailboxDomain.innerHTML = state.userDomains.map((domain) =>
+            mailboxDomain.innerHTML = domainOptionsSource.map((domain) =>
               '<option value="' + escapeAttr(domain.id) + '">' + escapeHtml(domain.domain) + '</option>'
             ).join("");
             mailboxDomain.disabled = false;
             document.getElementById("mailbox-submit").disabled = false;
           }
 
+          const mailboxOptionsSource = state.mailboxesAll.length ? state.mailboxesAll : state.mailboxes;
           selectors.mailboxPicker.innerHTML =
             '<option value="">' + escapeHtml(UI.common.selectMailbox) + '</option>' +
-            state.mailboxes.map((item) =>
+            mailboxOptionsSource.map((item) =>
               '<option value="' + escapeAttr(item.id) + '">' + escapeHtml(item.email_address) + '</option>'
             ).join("");
         }
 
         function renderTokenList() {
-          selectors.tokenList.innerHTML = renderTable(
+          selectors.tokenList.innerHTML = renderTableWithPagination(
+            "tokens",
             [UI.dashboard.name, UI.dashboard.prefix, UI.dashboard.status, UI.dashboard.lastUsed, UI.dashboard.actions],
             state.tokens.map((item) => [
               escapeHtml(item.name),
@@ -907,8 +978,10 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         }
 
         function renderDomainList() {
+          const paginationKey = CURRENT_USER.role === "admin" ? "allDomains" : "userDomains";
           const visibleDomains = CURRENT_USER.role === "admin" ? state.allDomains : state.userDomains;
-          selectors.domainList.innerHTML = renderTable(
+          selectors.domainList.innerHTML = renderTableWithPagination(
+            paginationKey,
             [UI.dashboard.domain, UI.dashboard.type, UI.dashboard.status, UI.dashboard.assigned, UI.dashboard.actions],
             visibleDomains.map((item) => [
               copyableMono(item.domain),
@@ -928,7 +1001,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
 
           const assignDomain = document.getElementById("assign-domain");
           if (assignDomain) {
-            const activeDomains = state.allDomains.filter((item) => item.status === "active");
+            const adminDomainSource = state.allDomainsAll.length ? state.allDomainsAll : state.allDomains;
+            const activeDomains = adminDomainSource.filter((item) => item.status === "active");
             if (activeDomains.length === 0) {
               assignDomain.innerHTML = '<option value="">' + escapeHtml(UI.dashboard.noActiveDomains) + '</option>';
               assignDomain.disabled = true;
@@ -942,18 +1016,20 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         function renderUsers() {
           const assignUser = document.getElementById("assign-user");
           if (assignUser) {
-            if (state.users.length === 0) {
+            const userSource = state.usersAll.length ? state.usersAll : state.users;
+            if (userSource.length === 0) {
               assignUser.innerHTML = '<option value="">' + escapeHtml(UI.dashboard.noUsersAvailable) + '</option>';
               assignUser.disabled = true;
             } else {
-              assignUser.innerHTML = state.users
+              assignUser.innerHTML = userSource
                 .map((item) => '<option value="' + escapeAttr(item.id) + '">' + escapeHtml(item.email) + '</option>')
                 .join("");
               assignUser.disabled = false;
             }
           }
 
-          selectors.userList.innerHTML = renderTable(
+          selectors.userList.innerHTML = renderTableWithPagination(
+            "users",
             [UI.dashboard.email, UI.dashboard.role, UI.dashboard.status, UI.dashboard.lastLogin, UI.dashboard.actions],
             state.users.map((item) => {
               const isSelf = item.id === CURRENT_USER.id;
@@ -976,11 +1052,12 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         }
 
         function renderMailboxMessages() {
-          if (state.mailboxes.length === 0) {
+          if ((state.mailboxesAll.length || state.mailboxes.length) === 0) {
             selectors.mailboxMessages.innerHTML = '<div class="notice">' + escapeHtml(UI.dashboard.selectMailboxFirst) + '</div>';
             return;
           }
-          selectors.mailboxMessages.innerHTML = renderTable(
+          selectors.mailboxMessages.innerHTML = renderTableWithPagination(
+            "mailboxMessages",
             [UI.dashboard.from, UI.dashboard.subject, UI.dashboard.received, UI.dashboard.size, UI.dashboard.attachments],
             state.mailboxMessages.map((item) => [
               escapeHtml(item.from_address || "-"),
@@ -1033,7 +1110,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
                 : "")
             : escapeHtml(UI.dashboard.cloudflareUnavailable);
 
-          selectors.adminMailboxList.innerHTML = renderTable(
+          selectors.adminMailboxList.innerHTML = renderTableWithPagination(
+            "adminMailboxes",
             [UI.dashboard.mailbox, UI.dashboard.owner, UI.dashboard.domain, UI.dashboard.status, UI.inbox.expires],
             state.adminMailboxes.map((item) => [
               copyableMono(item.email_address),
@@ -1044,7 +1122,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             ]),
           );
 
-          selectors.adminMessageList.innerHTML = renderTable(
+          selectors.adminMessageList.innerHTML = renderTableWithPagination(
+            "adminMessages",
             [UI.dashboard.to, UI.dashboard.from, UI.dashboard.subject, UI.dashboard.received, UI.dashboard.size, UI.dashboard.owner],
             state.adminMessages.map((item) => [
               copyableMono(item.to_address),
@@ -1056,7 +1135,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             ]),
           );
 
-          selectors.adminTokenList.innerHTML = renderTable(
+          selectors.adminTokenList.innerHTML = renderTableWithPagination(
+            "adminTokens",
             [UI.dashboard.assignUser, UI.dashboard.name, UI.dashboard.prefix, UI.dashboard.status, UI.dashboard.lastUsed, UI.dashboard.revoked, UI.dashboard.action],
             state.adminTokens.map((item) => [
               escapeHtml(item.user_email || "-"),
@@ -1071,7 +1151,8 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             ]),
           );
 
-          selectors.auditList.innerHTML = renderTable(
+          selectors.auditList.innerHTML = renderTableWithPagination(
+            "audits",
             [UI.dashboard.time, UI.dashboard.action, UI.dashboard.actor, UI.dashboard.target, UI.dashboard.metadata],
             state.audits.map((item) => [
               escapeHtml(item.created_at),
@@ -1083,50 +1164,197 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
           );
         }
 
-        async function loadMailboxMessages(mailboxId) {
+        function buildQuery(key) {
+          const meta = state.pagination[key];
+          if (!meta) return "";
+          const params = new URLSearchParams();
+          params.set("page", String(meta.page));
+          params.set("page_size", String(meta.pageSize));
+          return "?" + params.toString();
+        }
+
+        function applyPaginationMeta(key, payload) {
+          const meta = state.pagination[key];
+          if (!meta || !payload) return;
+          meta.page = payload.page ?? meta.page;
+          meta.pageSize = payload.page_size ?? meta.pageSize;
+          meta.total = payload.total ?? meta.total;
+          meta.totalPages = Math.max(1, payload.total_pages ?? 1);
+        }
+
+        async function loadMailboxMessages(mailboxId, options = {}) {
           if (!mailboxId) {
             state.mailboxMessages = [];
+            state.mailboxMessagesMailboxId = "";
+            state.pagination.mailboxMessages.page = 1;
+            state.pagination.mailboxMessages.total = 0;
+            state.pagination.mailboxMessages.totalPages = 1;
             renderMailboxMessages();
             return;
           }
+          if (state.mailboxMessagesMailboxId !== mailboxId && !options.keepPage) {
+            state.pagination.mailboxMessages.page = 1;
+          }
+          state.mailboxMessagesMailboxId = mailboxId;
           try {
-            const result = await request("/user/mailboxes/" + mailboxId + "/messages");
+            const result = await request(
+              "/user/mailboxes/" + mailboxId + "/messages" + buildQuery("mailboxMessages"),
+            );
             state.mailboxMessages = result.messages;
+            applyPaginationMeta("mailboxMessages", result.pagination);
           } catch (error) {
             state.mailboxMessages = [];
           }
           renderMailboxMessages();
+          renderMetrics();
         }
+
+        async function reloadUserDomains() {
+          const result = await request("/user/domains" + buildQuery("userDomains"));
+          state.userDomains = result.domains;
+          applyPaginationMeta("userDomains", result.pagination);
+          if (CURRENT_USER.role !== "admin") {
+            state.allDomains = state.userDomains;
+          }
+          try {
+            const all = await request("/user/domains?page=1&page_size=" + FULL_PAGE_SIZE);
+            state.userDomainsAll = all.domains || [];
+          } catch (error) {
+            state.userDomainsAll = [];
+          }
+          renderDomainList();
+          renderMailboxes();
+          renderMetrics();
+        }
+
+        async function reloadTokens() {
+          const result = await request("/user/api-tokens" + buildQuery("tokens"));
+          state.tokens = result.tokens;
+          applyPaginationMeta("tokens", result.pagination);
+          renderTokenList();
+          renderMetrics();
+        }
+
+        async function reloadMailboxes() {
+          const result = await request("/user/mailboxes" + buildQuery("mailboxes"));
+          state.mailboxes = result.mailboxes;
+          applyPaginationMeta("mailboxes", result.pagination);
+          try {
+            const all = await request("/user/mailboxes?page=1&page_size=" + FULL_PAGE_SIZE);
+            state.mailboxesAll = all.mailboxes || [];
+          } catch (error) {
+            state.mailboxesAll = [];
+          }
+          renderMailboxes();
+          renderMetrics();
+          const picker = selectors.mailboxPicker;
+          const preferred = picker.value || state.mailboxesAll[0]?.id || state.mailboxes[0]?.id || "";
+          if (preferred && preferred !== state.mailboxMessagesMailboxId) {
+            picker.value = preferred;
+            await loadMailboxMessages(preferred);
+          } else if (!preferred) {
+            await loadMailboxMessages("");
+          } else {
+            renderMailboxMessages();
+          }
+        }
+
+        async function reloadAdminUsers() {
+          const result = await request("/admin/users" + buildQuery("users"));
+          state.users = result.users;
+          applyPaginationMeta("users", result.pagination);
+          try {
+            const all = await request("/admin/users?page=1&page_size=" + FULL_PAGE_SIZE);
+            state.usersAll = all.users || [];
+          } catch (error) {
+            state.usersAll = [];
+          }
+          renderUsers();
+          renderMetrics();
+        }
+
+        async function reloadAdminDomains() {
+          const result = await request("/admin/domains" + buildQuery("allDomains"));
+          state.allDomains = result.domains;
+          applyPaginationMeta("allDomains", result.pagination);
+          try {
+            const all = await request("/admin/domains?page=1&page_size=" + FULL_PAGE_SIZE);
+            state.allDomainsAll = all.domains || [];
+          } catch (error) {
+            state.allDomainsAll = [];
+          }
+          renderDomainList();
+          renderMetrics();
+        }
+
+        async function reloadAdminMailboxes() {
+          const result = await request("/admin/mailboxes" + buildQuery("adminMailboxes"));
+          state.adminMailboxes = result.mailboxes;
+          applyPaginationMeta("adminMailboxes", result.pagination);
+          renderOps();
+          renderMetrics();
+        }
+
+        async function reloadAdminMessages() {
+          const result = await request("/admin/messages" + buildQuery("adminMessages"));
+          state.adminMessages = result.messages;
+          applyPaginationMeta("adminMessages", result.pagination);
+          renderOps();
+          renderMetrics();
+        }
+
+        async function reloadAdminTokens() {
+          const result = await request("/admin/api-tokens" + buildQuery("adminTokens"));
+          state.adminTokens = result.tokens;
+          applyPaginationMeta("adminTokens", result.pagination);
+          renderOps();
+          renderMetrics();
+        }
+
+        async function reloadAudits() {
+          const result = await request("/admin/audit-logs" + buildQuery("audits"));
+          state.audits = result.audit_logs;
+          applyPaginationMeta("audits", result.pagination);
+          renderOps();
+        }
+
+        const listReloaders = {
+          userDomains: reloadUserDomains,
+          allDomains: reloadAdminDomains,
+          tokens: reloadTokens,
+          mailboxes: reloadMailboxes,
+          mailboxMessages: async () => {
+            if (state.mailboxMessagesMailboxId) {
+              await loadMailboxMessages(state.mailboxMessagesMailboxId, { keepPage: true });
+            }
+          },
+          users: reloadAdminUsers,
+          adminMailboxes: reloadAdminMailboxes,
+          adminMessages: reloadAdminMessages,
+          adminTokens: reloadAdminTokens,
+          audits: reloadAudits,
+        };
 
         async function loadData(options = {}) {
           try {
-            const [domains, tokens, mailboxes] = await Promise.all([
-              request("/user/domains"),
-              request("/user/api-tokens"),
-              request("/user/mailboxes"),
+            await Promise.all([
+              reloadUserDomains(),
+              reloadTokens(),
+              reloadMailboxes(),
             ]);
-            state.userDomains = domains.domains;
-            state.tokens = tokens.tokens;
-            state.mailboxes = mailboxes.mailboxes;
-            state.allDomains = CURRENT_USER.role === "admin" ? state.allDomains : state.userDomains;
 
             if (CURRENT_USER.role === "admin") {
-              const [users, adminDomains, adminMailboxes, adminMessages, adminTokens, audits, cloudflareStatus] = await Promise.all([
-                request("/admin/users"),
-                request("/admin/domains"),
-                request("/admin/mailboxes"),
-                request("/admin/messages"),
-                request("/admin/api-tokens"),
-                request("/admin/audit-logs"),
-                request("/admin/cloudflare/status"),
+              await Promise.all([
+                reloadAdminUsers(),
+                reloadAdminDomains(),
+                reloadAdminMailboxes(),
+                reloadAdminMessages(),
+                reloadAdminTokens(),
+                reloadAudits(),
+                request("/admin/cloudflare/status").then((payload) => {
+                  state.cloudflareStatus = payload;
+                }),
               ]);
-              state.users = users.users;
-              state.allDomains = adminDomains.domains;
-              state.adminMailboxes = adminMailboxes.mailboxes;
-              state.adminMessages = adminMessages.messages;
-              state.adminTokens = adminTokens.tokens;
-              state.audits = audits.audit_logs;
-              state.cloudflareStatus = cloudflareStatus;
             }
 
             renderMetrics();
@@ -1135,7 +1363,6 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
             renderDomainList();
             renderUsers();
             renderOps();
-            await loadMailboxMessages(state.mailboxes[0]?.id || "");
 
             if (options.showToast) {
               window.toast(UI.dashboard.dataLoaded, "ok", 1600);
@@ -1196,6 +1423,64 @@ function dashboardPageHtml(user: { id: string; email: string; role: string }, lo
         // --- Mailbox picker ---
         selectors.mailboxPicker.addEventListener("change", (event) => {
           loadMailboxMessages(event.target.value);
+        });
+
+        // --- Pagination controls ---
+        async function handlePaginationChange(key) {
+          const reload = listReloaders[key];
+          if (!reload) return;
+          try {
+            await reload();
+          } catch (error) {
+            window.toast(error.message || UI.common.requestFailed, "error");
+          }
+        }
+
+        document.addEventListener("click", async (event) => {
+          const target = event.target.closest("[data-page-action]");
+          if (!target || target.disabled) return;
+          const key = target.getAttribute("data-page-key");
+          const action = target.getAttribute("data-page-action");
+          const meta = state.pagination[key];
+          if (!meta) return;
+          const totalPages = Math.max(1, meta.totalPages || 1);
+          let next = meta.page;
+          if (action === "first") next = 1;
+          else if (action === "prev") next = Math.max(1, meta.page - 1);
+          else if (action === "next") next = Math.min(totalPages, meta.page + 1);
+          else if (action === "last") next = totalPages;
+          if (next === meta.page) return;
+          meta.page = next;
+          await handlePaginationChange(key);
+        });
+
+        document.addEventListener("change", async (event) => {
+          const sizeTarget = event.target.closest("[data-page-size]");
+          if (sizeTarget) {
+            const key = sizeTarget.getAttribute("data-page-size");
+            const meta = state.pagination[key];
+            if (!meta) return;
+            const nextSize = Number.parseInt(sizeTarget.value, 10);
+            if (!Number.isInteger(nextSize) || nextSize <= 0) return;
+            meta.pageSize = nextSize;
+            meta.page = 1;
+            await handlePaginationChange(key);
+          }
+        });
+
+        document.addEventListener("keydown", async (event) => {
+          if (event.key !== "Enter") return;
+          const jumpTarget = event.target.closest("[data-page-jump]");
+          if (!jumpTarget) return;
+          event.preventDefault();
+          const key = jumpTarget.getAttribute("data-page-jump");
+          const meta = state.pagination[key];
+          if (!meta) return;
+          const totalPages = Math.max(1, meta.totalPages || 1);
+          const target = Math.min(totalPages, Math.max(1, Number.parseInt(jumpTarget.value, 10) || 1));
+          if (target === meta.page) return;
+          meta.page = target;
+          await handlePaginationChange(key);
         });
 
         // --- Revoke user token ---
@@ -1619,6 +1904,7 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
               <input id="message-search" class="input" type="search" placeholder="${ui.inbox.searchMessages}" autocomplete="off" />
             </div>
             <div id="message-list" class="message-list" role="listbox" aria-label="${ui.inbox.messages}"></div>
+            <div id="message-pagination"></div>
           </section>
           <section class="panel">
             <div class="panel-header">
@@ -1639,9 +1925,11 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
         const INBOX_TOKEN = ${jsonForScript(token)};
         const EXPIRES_AT_RAW = ${jsonForScript(expiresAt)};
         const UI = __UI__;
+        const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
         let currentMessageId = null;
         let allMessages = [];
         let searchQuery = "";
+        const pagination = { page: 1, pageSize: 20, total: 0, totalPages: 1 };
         const banner = document.getElementById("inbox-banner");
         const countdown = document.getElementById("expires-countdown");
 
@@ -1724,7 +2012,7 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
         function renderList() {
           const node = document.getElementById("message-list");
           const filtered = filterMessages();
-          document.getElementById("message-count").textContent = String(allMessages.length);
+          document.getElementById("message-count").textContent = String(pagination.total || allMessages.length);
 
           if (!allMessages.length) {
             node.innerHTML = '<div class="notice"><div class="empty-state">' +
@@ -1732,11 +2020,13 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
               '<div>' + escapeHtml(UI.inbox.noMessages) + '</div>' +
               '<div class="meta" style="margin:0;">' + escapeHtml(UI.inbox.noMessagesHint) + '</div>' +
             '</div></div>';
+            document.getElementById("message-pagination").innerHTML = "";
             return;
           }
 
           if (!filtered.length) {
             node.innerHTML = '<div class="notice">' + escapeHtml(UI.inbox.searchNoResults) + '</div>';
+            document.getElementById("message-pagination").innerHTML = "";
             return;
           }
 
@@ -1747,6 +2037,41 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
               '<div class="meta">' + escapeHtml(item.received_at) + ' · ' + escapeHtml(item.size || 0) + ' ' + UI.inbox.bytes + ' · ' + escapeHtml(item.attachment_count) + ' ' + UI.inbox.attachments + '</div>' +
             '</button>'
           ).join("");
+
+          renderInboxPagination();
+        }
+
+        function formatInboxPaginationSummary() {
+          return UI.common.pagination.summary
+            .replace("{page}", String(pagination.page))
+            .replace("{totalPages}", String(Math.max(1, pagination.totalPages)))
+            .replace("{total}", String(pagination.total));
+        }
+
+        function renderInboxPagination() {
+          const container = document.getElementById("message-pagination");
+          if (!container) return;
+          const totalPages = Math.max(1, pagination.totalPages);
+          const page = pagination.page;
+          const disabledPrev = page <= 1 ? " disabled" : "";
+          const disabledNext = page >= totalPages ? " disabled" : "";
+
+          const sizeOptions = PAGE_SIZE_OPTIONS
+            .map((size) => '<option value="' + size + '"' + (size === pagination.pageSize ? " selected" : "") + '>' + size + '</option>')
+            .join("");
+
+          container.innerHTML = '<div class="pagination">' +
+            '<div class="pagination-summary">' + escapeHtml(formatInboxPaginationSummary()) + '</div>' +
+            '<div class="pagination-controls">' +
+              '<label class="pagination-summary" style="margin-right:4px;">' + escapeHtml(UI.common.pagination.pageSize) + '</label>' +
+              '<select class="page-size-select" id="inbox-page-size">' + sizeOptions + '</select>' +
+              '<button type="button" class="button sm ghost" id="inbox-page-first"' + disabledPrev + '>' + escapeHtml(UI.common.pagination.first) + '</button>' +
+              '<button type="button" class="button sm ghost" id="inbox-page-prev"' + disabledPrev + '>' + escapeHtml(UI.common.pagination.prev) + '</button>' +
+              '<input type="number" min="1" max="' + totalPages + '" value="' + page + '" class="page-jump" id="inbox-page-jump" aria-label="' + escapeHtml(UI.common.pagination.jumpTo) + '" />' +
+              '<button type="button" class="button sm ghost" id="inbox-page-next"' + disabledNext + '>' + escapeHtml(UI.common.pagination.next) + '</button>' +
+              '<button type="button" class="button sm ghost" id="inbox-page-last"' + disabledNext + '>' + escapeHtml(UI.common.pagination.last) + '</button>' +
+            '</div>' +
+          '</div>';
         }
 
         function renderMessage(result) {
@@ -1779,9 +2104,18 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
 
         async function loadMessages(options = {}) {
           clearInboxError();
-          const result = await request("/inbox/" + encodeURIComponent(INBOX_TOKEN) + "/messages");
+          const params = new URLSearchParams();
+          params.set("page", String(pagination.page));
+          params.set("page_size", String(pagination.pageSize));
+          const result = await request("/inbox/" + encodeURIComponent(INBOX_TOKEN) + "/messages?" + params.toString());
           const previousCount = allMessages.length;
           allMessages = result.messages || [];
+          if (result.pagination) {
+            pagination.page = result.pagination.page ?? pagination.page;
+            pagination.pageSize = result.pagination.page_size ?? pagination.pageSize;
+            pagination.total = result.pagination.total ?? pagination.total;
+            pagination.totalPages = Math.max(1, result.pagination.total_pages ?? 1);
+          }
           renderList();
 
           if (!currentMessageId && allMessages.length) {
@@ -1848,6 +2182,45 @@ function inboxPageHtml(mailbox: Record<string, unknown>, token: string, locale: 
           if (!target) return;
           const btn = document.querySelector('[data-message-id="' + target.id + '"]');
           if (btn) btn.click();
+        });
+
+        // --- Inbox pagination controls ---
+        document.addEventListener("click", async (event) => {
+          const btn = event.target.closest("#inbox-page-first, #inbox-page-prev, #inbox-page-next, #inbox-page-last");
+          if (!btn || btn.disabled) return;
+          const totalPages = Math.max(1, pagination.totalPages);
+          let next = pagination.page;
+          if (btn.id === "inbox-page-first") next = 1;
+          else if (btn.id === "inbox-page-prev") next = Math.max(1, pagination.page - 1);
+          else if (btn.id === "inbox-page-next") next = Math.min(totalPages, pagination.page + 1);
+          else if (btn.id === "inbox-page-last") next = totalPages;
+          if (next === pagination.page) return;
+          pagination.page = next;
+          currentMessageId = null;
+          try { await loadMessages({ silent: true }); } catch (error) { showInboxError(error.message); }
+        });
+
+        document.addEventListener("change", async (event) => {
+          if (event.target.id === "inbox-page-size") {
+            const nextSize = Number.parseInt(event.target.value, 10);
+            if (!Number.isInteger(nextSize) || nextSize <= 0) return;
+            pagination.pageSize = nextSize;
+            pagination.page = 1;
+            currentMessageId = null;
+            try { await loadMessages({ silent: true }); } catch (error) { showInboxError(error.message); }
+          }
+        });
+
+        document.addEventListener("keydown", async (event) => {
+          if (event.key === "Enter" && event.target.id === "inbox-page-jump") {
+            event.preventDefault();
+            const totalPages = Math.max(1, pagination.totalPages);
+            const target = Math.min(totalPages, Math.max(1, Number.parseInt(event.target.value, 10) || 1));
+            if (target === pagination.page) return;
+            pagination.page = target;
+            currentMessageId = null;
+            try { await loadMessages({ silent: true }); } catch (error) { showInboxError(error.message); }
+          }
         });
 
         setInterval(() => { loadMessages({ silent: false }).catch(() => {}); }, 30000);

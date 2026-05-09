@@ -1,6 +1,7 @@
 import { generateId } from "./crypto";
 import { configureDomainWithCloudflare, getStoredCloudflareApiToken } from "./cloudflare";
 import { AppRouteError } from "./errors";
+import { buildPaginationMeta, type PaginationMeta, type PaginationParams } from "./pagination";
 import { optionalString, requireString } from "./request";
 import type { AppEnv } from "../types/env";
 
@@ -94,7 +95,17 @@ export async function getDomainById(env: AppEnv, domainId: string) {
   );
 }
 
-export async function listDomains(env: AppEnv) {
+export async function listDomains(
+  env: AppEnv,
+  pagination: PaginationParams,
+): Promise<{ items: Record<string, unknown>[]; meta: PaginationMeta }> {
+  const totalRow = await env.DB.prepare(
+    `
+      SELECT COUNT(*) AS total
+      FROM domains
+    `,
+  ).first<{ total: number | string }>();
+
   const result = await env.DB.prepare(
     `
       SELECT
@@ -113,10 +124,16 @@ export async function listDomains(env: AppEnv) {
       LEFT JOIN user_domains ud ON ud.domain_id = d.id
       GROUP BY d.id
       ORDER BY d.created_at DESC
+      LIMIT ? OFFSET ?
     `,
-  ).all<Record<string, unknown>>();
+  )
+    .bind(pagination.pageSize, pagination.offset)
+    .all<Record<string, unknown>>();
 
-  return result.results;
+  return {
+    items: result.results,
+    meta: buildPaginationMeta(Number(totalRow?.total ?? 0), pagination),
+  };
 }
 
 export async function assignDomainToUser(env: AppEnv, userId: string, domainId: string) {
