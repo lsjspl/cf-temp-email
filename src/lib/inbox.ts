@@ -6,11 +6,6 @@ import { buildPaginationMeta, type PaginationMeta, type PaginationParams } from 
 import { getLinkSecret } from "./runtime-secrets";
 import type { AppEnv } from "../types/env";
 
-interface InboxTokenPayload {
-  mailboxId: string;
-  expiresAt: string;
-}
-
 interface InboxAuditContext {
   ip?: string | null;
   userAgent?: string | null;
@@ -18,9 +13,10 @@ interface InboxAuditContext {
 
 export async function validateInboxAccessToken(
   env: AppEnv,
-  encryptedToken: string,
+  linkToken: string,
   auditContext?: InboxAuditContext,
 ) {
+  // 查找 access link
   const storedLink = await env.DB.prepare(
     `
       SELECT id, mailbox_id, expires_at
@@ -29,7 +25,7 @@ export async function validateInboxAccessToken(
       LIMIT 1
     `,
   )
-    .bind(encryptedToken)
+    .bind(linkToken)
     .first<{ id: string; mailbox_id: string; expires_at: string }>();
 
   if (!storedLink) {
@@ -37,68 +33,50 @@ export async function validateInboxAccessToken(
       await writeAuditLog(env, {
         action: "inbox.access.rejected",
         targetType: "mailbox_access_link",
-        targetId: encryptedToken.slice(0, 32),
+        targetId: linkToken.slice(0, 40),
         ip: auditContext.ip ?? null,
         userAgent: auditContext.userAgent ?? null,
-        metadata: {
-          reason: "link_not_found",
-        },
+        metadata: { reason: "link_not_found" },
       });
     }
     throw new AppRouteError(404, "NOT_FOUND", "Inbox link not found.");
   }
 
-  let payload: InboxTokenPayload;
-  try {
-    const raw = await decryptJsonToken<Record<string, string>>(encryptedToken, await getLinkSecret(env));
-    // 兼容新旧格式：新格式用 m/e 短键，旧格式用 mailboxId/expiresAt
-    payload = {
-      mailboxId: raw.m ?? raw.mailboxId ?? "",
-      expiresAt: raw.e ?? raw.expiresAt ?? "",
-    };
-  } catch {
-    if (auditContext) {
-      await writeAuditLog(env, {
-        action: "inbox.access.rejected",
-        targetType: "mailbox_access_link",
-        targetId: encryptedToken.slice(0, 32),
-        ip: auditContext.ip ?? null,
-        userAgent: auditContext.userAgent ?? null,
-        metadata: {
-          reason: "token_invalid",
-        },
-      });
+  // 新格式（lnk_ 开头）：短 ID 本身不可猜测，无需解密验证
+  // 旧格式（加密 token）：需要解密验证 mailbox_id 匹配
+  const isNewFormat = linkToken.startsWith("lnk_");
+  if (!isNewFormat) {
+    try {
+      const raw = await decryptJsonToken<Record<string, string>>(linkToken, await getLinkSecret(env));
+      const mailboxId = raw.m ?? raw.mailboxId ?? "";
+      if (mailboxId !== storedLink.mailbox_id) {
+        throw new Error("mismatch");
+      }
+    } catch {
+      if (auditContext) {
+        await writeAuditLog(env, {
+          action: "inbox.access.rejected",
+          targetType: "mailbox_access_link",
+          targetId: linkToken.slice(0, 40),
+          ip: auditContext.ip ?? null,
+          userAgent: auditContext.userAgent ?? null,
+          metadata: { reason: "token_invalid" },
+        });
+      }
+      throw new AppRouteError(401, "UNAUTHORIZED", "Inbox link is invalid.");
     }
-    throw new AppRouteError(401, "UNAUTHORIZED", "Inbox link is invalid.");
   }
 
-  if (payload.mailboxId !== storedLink.mailbox_id) {
+  // 检查过期
+  if (new Date(storedLink.expires_at).getTime() <= Date.now()) {
     if (auditContext) {
       await writeAuditLog(env, {
         action: "inbox.access.rejected",
         targetType: "mailbox_access_link",
-        targetId: encryptedToken.slice(0, 32),
+        targetId: linkToken.slice(0, 40),
         ip: auditContext.ip ?? null,
         userAgent: auditContext.userAgent ?? null,
-        metadata: {
-          reason: "mailbox_mismatch",
-        },
-      });
-    }
-    throw new AppRouteError(401, "UNAUTHORIZED", "Inbox link is invalid.");
-  }
-
-  if (new Date(payload.expiresAt).getTime() <= Date.now()) {
-    if (auditContext) {
-      await writeAuditLog(env, {
-        action: "inbox.access.rejected",
-        targetType: "mailbox_access_link",
-        targetId: encryptedToken.slice(0, 32),
-        ip: auditContext.ip ?? null,
-        userAgent: auditContext.userAgent ?? null,
-        metadata: {
-          reason: "token_expired",
-        },
+        metadata: { reason: "token_expired" },
       });
     }
     throw new AppRouteError(410, "MAILBOX_EXPIRED", "Inbox link has expired.");
@@ -119,9 +97,9 @@ export async function validateInboxAccessToken(
     throw new AppRouteError(404, "NOT_FOUND", "Mailbox not found.");
   }
 
-  // 异步更新 last_used_at，不阻塞响应
+  // 异步更新 last_used_at
   env.DB.prepare("UPDATE mailbox_access_links SET last_used_at = ? WHERE id = ?")
-    .bind(new Date().toISOString(), encryptedToken)
+    .bind(new Date().toISOString(), linkToken)
     .run();
 
   return {

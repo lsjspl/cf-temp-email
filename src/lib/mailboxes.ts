@@ -168,12 +168,10 @@ export async function createMailbox(
     Date.now() + resolveTtlSeconds(env, ttlSeconds) * 1000,
   ).toISOString();
   const accessSecretHash = await sha256Hex(generateId("access"));
-  // 精简 payload：移除冗余 nonce（AES-GCM 的 IV 已保证唯一性），缩短 token 长度
+  // 生成短链接 ID 和加密 token（token 只存数据库，URL 用短 ID）
+  const linkId = generateId("lnk");
   const encryptedToken = await encryptJsonToken(
-    {
-      m: mailboxId,
-      e: expiresAt,
-    },
+    { m: mailboxId, e: expiresAt },
     await getLinkSecret(env),
   );
   const tokenHash = await sha256Hex(encryptedToken);
@@ -217,14 +215,14 @@ export async function createMailbox(
         )
         VALUES (?, ?, ?, ?, ?)
       `,
-    ).bind(encryptedToken, mailboxId, tokenHash, expiresAt, createdAt),
+    ).bind(linkId, mailboxId, tokenHash, expiresAt, createdAt),
   ]);
 
   return {
     id: mailboxId,
     email_address: emailAddress,
     expires_at: expiresAt,
-    encrypted_access_url: mailboxLinkUrl(requestUrl, encryptedToken),
+    encrypted_access_url: mailboxLinkUrl(requestUrl, linkId),
   };
 }
 
