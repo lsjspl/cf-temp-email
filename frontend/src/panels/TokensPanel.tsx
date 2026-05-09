@@ -20,6 +20,7 @@ export default function TokensPanel() {
   const [addOpen, setAddOpen] = useState(false);
   const [newTokenValue, setNewTokenValue] = useState("");
   const [editItem, setEditItem] = useState<Token | null>(null);
+  const [exampleItem, setExampleItem] = useState<Token | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -80,8 +81,9 @@ export default function TokensPanel() {
           { key: "prefix", header: "前缀", width: "140px", render: (t) => <span className="font-mono text-sm text-muted">{t.token_prefix}...</span> },
           { key: "status", header: "状态", width: "90px", render: (t) => <StatusTag value={t.status} /> },
           { key: "lastUsed", header: "最近使用", width: "180px", render: (t) => <TimeCell value={t.last_used_at} /> },
-          { key: "actions", header: "操作", className: "!overflow-visible whitespace-nowrap", render: (t) => t.status === "revoked" ? <span className="text-muted text-sm">已撤销</span> : (
+          { key: "actions", header: "操作", className: "!overflow-visible whitespace-nowrap w-[1%] text-center", render: (t) => t.status === "revoked" ? <span className="text-muted text-sm">已撤销</span> : (
             <Dropdown>
+              <DropdownItem onClick={() => setExampleItem(t)}>使用示例</DropdownItem>
               <DropdownItem onClick={() => setEditItem(t)}>编辑名称</DropdownItem>
               <DropdownItem danger onClick={() => handleRevoke(t.id)}>撤销</DropdownItem>
             </Dropdown>
@@ -97,6 +99,7 @@ export default function TokensPanel() {
         onPageSizeChange={(s) => load(1, s)}
       />
       <CreateTokenModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleCreate} />
+
       {newTokenValue && (
         <Modal open title="Token 已创建 ✓" onClose={() => setNewTokenValue("")} confirmText="我已保存" onConfirm={() => setNewTokenValue("")}>
           <div className="space-y-3">
@@ -107,6 +110,7 @@ export default function TokensPanel() {
         </Modal>
       )}
       {editItem && <EditTokenModal token={editItem} onClose={() => setEditItem(null)} onSubmit={handleEdit} />}
+      {exampleItem && <ApiExampleModal token={exampleItem} onClose={() => setExampleItem(null)} />}
     </div>
   );
 }
@@ -132,6 +136,76 @@ function EditTokenModal({ token, onClose, onSubmit }: { token: Token; onClose: (
       <div>
         <label className="text-sm text-muted block mb-1.5">名称</label>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      </div>
+    </Modal>
+  );
+}
+
+function ApiExampleModal({ token, onClose }: { token: Token; onClose: () => void }) {
+  const host = window.location.origin;
+  const bearer = `${token.token_prefix}...`;
+
+  return (
+    <Modal open title={`API 使用示例 — ${token.name}`} onClose={onClose} confirmText="关闭" onConfirm={onClose} cancelText="">
+      <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+        <div>
+          <h4 className="font-medium text-white text-sm mb-1.5">认证方式</h4>
+          <pre className="bg-white/[0.04] border border-line rounded-md p-3 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+{`Authorization: Bearer ${bearer}`}
+          </pre>
+        </div>
+
+        <div>
+          <h4 className="font-medium text-white text-sm mb-1.5">创建临时邮箱</h4>
+          <pre className="bg-white/[0.04] border border-line rounded-md p-3 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+{`curl -X POST ${host}/api/v1/mailboxes \\
+  -H "Authorization: Bearer <your-token>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "domain_id": "dom_xxx",
+    "prefix": "test",
+    "ttl_seconds": 3600
+  }'`}
+          </pre>
+          <p className="text-xs text-muted mt-1">prefix 可选（留空随机），ttl_seconds 可选（默认 86400）</p>
+        </div>
+
+        <div>
+          <h4 className="font-medium text-white text-sm mb-1.5">查询邮箱列表</h4>
+          <pre className="bg-white/[0.04] border border-line rounded-md p-3 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+{`curl ${host}/api/v1/mailboxes \\
+  -H "Authorization: Bearer <your-token>"`}
+          </pre>
+        </div>
+
+        <div>
+          <h4 className="font-medium text-white text-sm mb-1.5">查询邮件列表</h4>
+          <pre className="bg-white/[0.04] border border-line rounded-md p-3 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+{`curl ${host}/api/v1/mailboxes/{mailbox_id}/messages \\
+  -H "Authorization: Bearer <your-token>"`}
+          </pre>
+        </div>
+
+        <div>
+          <h4 className="font-medium text-white text-sm mb-1.5">响应格式</h4>
+          <pre className="bg-white/[0.04] border border-line rounded-md p-3 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+{`// 成功
+{
+  "id": "mb_xxx",
+  "email_address": "test@example.com",
+  "expires_at": "2026-05-10T12:00:00.000Z",
+  "encrypted_access_url": "${host}/inbox/lnk_xxx"
+}
+
+// 错误
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "domain_id is required"
+  }
+}`}
+          </pre>
+        </div>
       </div>
     </Modal>
   );

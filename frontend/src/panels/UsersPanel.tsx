@@ -85,7 +85,7 @@ export default function UsersPanel({ currentUserId }: { currentUserId: string })
           { key: "role", header: "角色", render: (u) => <StatusTag value={u.role} /> },
           { key: "status", header: "状态", render: (u) => <StatusTag value={u.status} /> },
           { key: "lastLogin", header: "最近登录", render: (u) => <span className="text-xs text-muted">{formatTime(u.last_login_at)}</span> },
-          { key: "actions", header: "操作", render: (u) => u.id === currentUserId ? <span className="text-muted text-xs">—</span> : (
+          { key: "actions", header: "操作", className: "!overflow-visible whitespace-nowrap w-[1%] text-center", render: (u) => u.id === currentUserId ? <span className="text-muted text-xs">—</span> : (
             <Dropdown>
               <DropdownItem onClick={() => setAssignUser(u)}>分配域名</DropdownItem>
               <DropdownItem onClick={() => setEditItem(u)}>编辑</DropdownItem>
