@@ -86,7 +86,7 @@ export default function MailboxesPanel({ isAdmin }: { isAdmin: boolean }) {
               <button className="btn-ghost !px-2 !py-1 !min-h-0 text-sm" onClick={() => { copyText(m.encrypted_access_url!); toast("已复制", "ok"); }}>复制</button>
             </div>
           ) : <span className="text-muted">-</span> },
-          { key: "actions", header: "操作", width: "80px", render: (m) => (
+          { key: "actions", header: "操作", className: "!overflow-visible whitespace-nowrap", render: (m) => (
             <Dropdown>
               <DropdownItem danger onClick={() => handleDelete(m.id)}>删除</DropdownItem>
             </Dropdown>

@@ -80,7 +80,7 @@ export default function TokensPanel() {
           { key: "prefix", header: "前缀", width: "140px", render: (t) => <span className="font-mono text-sm text-muted">{t.token_prefix}...</span> },
           { key: "status", header: "状态", width: "90px", render: (t) => <StatusTag value={t.status} /> },
           { key: "lastUsed", header: "最近使用", width: "180px", render: (t) => <TimeCell value={t.last_used_at} /> },
-          { key: "actions", header: "操作", width: "80px", render: (t) => t.status === "revoked" ? <span className="text-muted text-sm">已撤销</span> : (
+          { key: "actions", header: "操作", className: "!overflow-visible whitespace-nowrap", render: (t) => t.status === "revoked" ? <span className="text-muted text-sm">已撤销</span> : (
             <Dropdown>
               <DropdownItem onClick={() => setEditItem(t)}>编辑名称</DropdownItem>
               <DropdownItem danger onClick={() => handleRevoke(t.id)}>撤销</DropdownItem>

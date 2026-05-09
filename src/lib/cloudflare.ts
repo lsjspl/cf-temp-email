@@ -306,95 +306,102 @@ export async function cleanupDomainFromCloudflare(
   const errors: string[] = [];
   const token = await getStoredCloudflareApiToken(env);
   if (!token) {
-    return { success: true, errors: [] }; // 没配置 token，跳过
-  }
-
-  const zoneId = domainRecord.zone_id;
-  if (!zoneId) {
-    // 没有 zone_id 说明从未配置过 Cloudflare，跳过
     return { success: true, errors: [] };
   }
 
-  // 1. 删除 DNS 记录（MX、TXT 等 Email Routing 相关记录）
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  // 解析 zone_id：优先用数据库存储的，否则动态查找
+  let zoneId = domainRecord.zone_id;
+  if (!zoneId) {
+    try {
+      const zone = await resolveZoneForDomain(env, domainRecord.domain);
+      zoneId = zone.id;
+    } catch {
+      // 找不到 zone，无法清理
+      return { success: true, errors: [] };
+    }
+  }
+
+  // 1. 删除该域名相关的所有 DNS 记录（MX、TXT、CNAME）
   try {
-    // 先查找该域名相关的所有 DNS 记录
     const dnsResponse = await fetch(
       `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?name=${encodeURIComponent(domainRecord.domain)}&per_page=100`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      },
+      { headers },
     );
-    const dnsPayload = (await dnsResponse.json().catch(() => null)) as CloudflareEnvelope<Array<{ id: string; type: string; name: string }>> | null;
+    const dnsPayload = (await dnsResponse.json().catch(() => null)) as CloudflareEnvelope<Array<{ id: string; type: string; name: string; content: string }>> | null;
 
     if (dnsPayload?.success && dnsPayload.result) {
-      // 删除 MX 和 TXT 记录（Email Routing 创建的）
-      const emailRecords = dnsPayload.result.filter(
-        (r) => (r.type === "MX" || r.type === "TXT") && r.name === domainRecord.domain,
-      );
+      // 删除所有 Email Routing 相关记录
+      const emailRecords = dnsPayload.result.filter((r) => {
+        if (r.name !== domainRecord.domain) return false;
+        if (r.type === "MX" || r.type === "TXT") return true;
+        if (r.type === "CNAME" && (r.content?.includes("email") || r.content?.includes("route"))) return true;
+        return false;
+      });
       for (const record of emailRecords) {
         try {
-          await fetch(
+          const res = await fetch(
             `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${record.id}`,
-            {
-              method: "DELETE",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            },
+            { method: "DELETE", headers },
           );
+          if (!res.ok) {
+            const body = await res.text().catch(() => "");
+            errors.push(`Delete DNS ${record.type} ${record.id}: ${res.status} ${body.slice(0, 100)}`);
+          }
         } catch (e) {
-          errors.push(`Failed to delete DNS record ${record.id}: ${e instanceof Error ? e.message : "unknown"}`);
+          errors.push(`Delete DNS ${record.id}: ${e instanceof Error ? e.message : "unknown"}`);
         }
       }
     }
-
-    // 如果有存储的 dns_record_id，也尝试删除
-    if (domainRecord.cloudflare_dns_record_id) {
-      try {
-        await fetch(
-          `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${domainRecord.cloudflare_dns_record_id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-      } catch (e) {
-        errors.push(`Failed to delete stored DNS record: ${e instanceof Error ? e.message : "unknown"}`);
-      }
-    }
   } catch (e) {
-    errors.push(`DNS cleanup failed: ${e instanceof Error ? e.message : "unknown"}`);
+    errors.push(`DNS query failed: ${e instanceof Error ? e.message : "unknown"}`);
   }
 
-  // 2. 禁用 catch-all 规则（不能直接删除，改为禁用）
-  if (domainRecord.cloudflare_rule_id) {
+  // 2. 如果有存储的 dns_record_id，也尝试删除
+  if (domainRecord.cloudflare_dns_record_id) {
     try {
       await fetch(
-        `https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/rules/catch_all`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Disabled catch-all",
-            enabled: false,
-            matchers: [{ type: "all" }],
-            actions: [{ type: "drop" }],
-          }),
-        },
+        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${domainRecord.cloudflare_dns_record_id}`,
+        { method: "DELETE", headers },
       );
-    } catch (e) {
-      errors.push(`Failed to disable catch-all rule: ${e instanceof Error ? e.message : "unknown"}`);
+    } catch { /* best effort */ }
+  }
+
+  // 3. 调用 Email Routing DNS DELETE API 禁用该 zone 的 Email Routing
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/dns`,
+      { method: "DELETE", headers },
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      errors.push(`Disable email routing: ${res.status} ${body.slice(0, 100)}`);
     }
+  } catch (e) {
+    errors.push(`Disable email routing: ${e instanceof Error ? e.message : "unknown"}`);
+  }
+
+  // 4. 禁用 catch-all 规则
+  try {
+    await fetch(
+      `https://api.cloudflare.com/client/v4/zones/${zoneId}/email/routing/rules/catch_all`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          name: "Disabled",
+          enabled: false,
+          matchers: [{ type: "all" }],
+          actions: [{ type: "drop" }],
+        }),
+      },
+    );
+  } catch (e) {
+    errors.push(`Disable catch-all: ${e instanceof Error ? e.message : "unknown"}`);
   }
 
   return { success: errors.length === 0, errors };

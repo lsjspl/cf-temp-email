@@ -65,9 +65,9 @@ export default function Table<T extends { id?: string }>({
                   <td
                     key={col.key}
                     className={`px-3.5 py-3 ${col.className ?? ""}`}
-                    style={col.width ? { width: col.width, maxWidth: col.width } : undefined}
+                    style={col.width ? { width: col.width } : undefined}
                   >
-                    <div className="truncate">{col.render(item)}</div>
+                    {col.width ? <div className="truncate">{col.render(item)}</div> : col.render(item)}
                   </td>
                 ))}
               </tr>

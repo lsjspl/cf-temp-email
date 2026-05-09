@@ -91,7 +91,7 @@ export default function DomainsPanel({ isAdmin }: { isAdmin: boolean }) {
           { key: "domain", header: "域名", render: (d) => <span className="font-mono text-sm">{d.domain}</span> },
           { key: "type", header: "类型", width: "90px", render: (d) => <StatusTag value={d.type} /> },
           { key: "status", header: "状态", width: "90px", render: (d) => <StatusTag value={d.status} /> },
-          ...(isAdmin ? [{ key: "actions", header: "操作", width: "80px", render: (d: Domain) => (
+          ...(isAdmin ? [{ key: "actions", header: "操作", className: "!overflow-visible whitespace-nowrap", render: (d: Domain) => (
             <Dropdown>
               <DropdownItem onClick={() => setEditItem(d)}>编辑</DropdownItem>
               <DropdownItem onClick={() => handleConfigure(d.id)}>配置 CF</DropdownItem>
